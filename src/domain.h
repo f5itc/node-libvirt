@@ -78,6 +78,7 @@ namespace NodeLibvirt {
             static Handle<Value> MemoryPeek(const Arguments& args);
             static Handle<Value> GetMemoryStats(const Arguments& args);
             static Handle<Value> BlockPeek(const Arguments& args);
+            static Handle<Value> BlockPull(const Arguments& args);
             static Handle<Value> GetBlockStats(const Arguments& args);
             static Handle<Value> GetBlockInfo(const Arguments& args);
             static Handle<Value> CoreDump(const Arguments& args);

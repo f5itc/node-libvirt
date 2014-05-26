@@ -118,6 +118,8 @@ namespace NodeLibvirt {
                                       Domain::GetMemoryStats);
         NODE_SET_PROTOTYPE_METHOD(t, "blockPeek",
                                       Domain::BlockPeek);
+        NODE_SET_PROTOTYPE_METHOD(t, "blockPull",
+                                      Domain::BlockPull);
         NODE_SET_PROTOTYPE_METHOD(t, "getBlockStats",
                                       Domain::GetBlockStats);
         NODE_SET_PROTOTYPE_METHOD(t, "getBlockInfo",
@@ -1912,6 +1914,42 @@ namespace NodeLibvirt {
         free(buffer_);
 
         return scope.Close(buffer->handle_);
+    }
+
+    Handle<Value> Domain::BlockPull(const Arguments& args) {
+        HandleScope scope;
+		    unsigned int bandwidth = 0;
+		    unsigned int flags = 0;
+
+        if(args.Length() < 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify two arguments to invoke this function")));
+        }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string in the first argument")));
+        }
+
+        if(!args[1]->IsNumber()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a number in the second argument")));
+        }
+
+        String::Utf8Value path(args[0]->ToString());
+
+        bandwidth = args[1]->NumberValue();
+
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        int ret = virDomainBlockPull(domain->domain_, (const char *) *path, bandwidth, flags);
+
+        if(ret == -1) {
+            ThrowException(Error::New(virGetLastError()));
+            return Null();
+        }
+
+        return True();
     }
 
     Handle<Value> Domain::GetBlockStats(const Arguments& args) {
