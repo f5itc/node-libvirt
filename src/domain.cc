@@ -120,6 +120,8 @@ namespace NodeLibvirt {
                                       Domain::BlockPeek);
         NODE_SET_PROTOTYPE_METHOD(t, "blockPull",
                                       Domain::BlockPull);
+        NODE_SET_PROTOTYPE_METHOD(t, "blockRebase",
+                                      Domain::BlockRebase);
         NODE_SET_PROTOTYPE_METHOD(t, "getBlockStats",
                                       Domain::GetBlockStats);
         NODE_SET_PROTOTYPE_METHOD(t, "getBlockInfo",
@@ -1979,6 +1981,58 @@ namespace NodeLibvirt {
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
         int ret = virDomainBlockPull(domain->domain_, (const char *) *path, bandwidth, flags);
+
+        if(ret == -1) {
+            ThrowException(Error::New(virGetLastError()));
+            return Null();
+        }
+
+        return True();
+    }
+
+    Handle<Value> Domain::BlockRebase(const Arguments& args) {
+        HandleScope scope;
+		    unsigned int bandwidth = 0;
+		    unsigned int flags = 0;
+
+        if(args.Length() < 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify at least two arguments to invoke this function")));
+        }
+
+        if(!args[0]->IsString() || !args[1]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string in the first and second arguments")));
+        }
+
+        String::Utf8Value disk(args[0]->ToString());
+        String::Utf8Value base(args[1]->ToString());
+
+        if(args.Length() > 2) {
+            if(!args[2]->IsNumber()) {
+                return ThrowException(Exception::TypeError(
+                String::New("Third argument, if specified, must be a number")));
+            }
+            bandwidth = args[2]->NumberValue();
+        }
+
+        if(args.Length() > 3) {
+            if(!args[3]->IsObject()) {
+                return ThrowException(Exception::TypeError(
+                String::New("Fourth argument, if specified, must be an object")));
+            }
+
+            Local<Array> flags_ = Local<Array>::Cast(args[1]);
+            unsigned int length = flags_->Length();
+
+            for (unsigned int i = 0; i < length; i++) {
+                flags |= flags_->Get(Integer::New(i))->Int32Value();
+            }
+        }
+
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        int ret = virDomainBlockRebase(domain->domain_, (const char *) *disk, (const char *) *base, bandwidth, flags);
 
         if(ret == -1) {
             ThrowException(Error::New(virGetLastError()));
