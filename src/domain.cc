@@ -2119,9 +2119,30 @@ namespace NodeLibvirt {
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(args.Length() == 1 && args[0]->IsString()) {
+        if(args.Length() > 0) {
+            if (!args[0]->IsString()) {
+                return ThrowException(Exception::TypeError(
+                String::New("First argument, if provided, must be a string to invoke this function")));
+            }
+
             String::Utf8Value xml(args[0]->ToString());
+
+            if (args.Length() > 1) {
+                if (!args[1]->IsObject()) {
+                    return ThrowException(Exception::TypeError(
+                    String::New("Second argument, if provided, must be an object to invoke this function")));
+                }
+
+                Local<Array> flags_ = Local<Array>::Cast(args[1]);
+                unsigned int length = flags_->Length();
+
+                for (unsigned int i = 0; i < length; i++) {
+                    flags |= flags_->Get(Integer::New(i))->Int32Value();
+                }
+            }
+
             snapshot = virDomainSnapshotCreateXML(domain->domain_, (const char *) *xml, flags);
+
         } else {
             snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
         }
