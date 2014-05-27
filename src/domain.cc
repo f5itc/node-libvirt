@@ -2115,7 +2115,8 @@ namespace NodeLibvirt {
     Handle<Value> Domain::RevertToSnapshot(const Arguments& args) {
         HandleScope scope;
         virDomainSnapshotPtr snapshot = NULL;
-        unsigned int flags = 0;
+        unsigned int lookupflags = 0;
+        unsigned int revertflags = 0;
         int ret = -1;
 
         if(args.Length() == 0 || !args[0]->IsString()) {
@@ -2134,18 +2135,18 @@ namespace NodeLibvirt {
             unsigned int length = flags_->Length();
 
             for (unsigned int i = 0; i < length; i++) {
-                flags |= flags_->Get(Integer::New(i))->Int32Value();
+                revertflags |= flags_->Get(Integer::New(i))->Int32Value();
             }
         }
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, flags);
+        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, lookupflags);
         if(snapshot == NULL) {
             ThrowException(Error::New(virGetLastError()));
             return False();
         }
 
-        ret = virDomainRevertToSnapshot(snapshot, flags);
+        ret = virDomainRevertToSnapshot(snapshot, revertflags);
 
         if(ret == -1) {
             virDomainSnapshotFree(snapshot);
