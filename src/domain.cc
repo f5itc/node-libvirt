@@ -383,6 +383,21 @@ namespace NodeLibvirt {
             String::New("You must specify a string as first argument")));
         }
 
+        if(argsl > 1) {
+            if(!args[1]->IsArray()) {
+                return ThrowException(Exception::TypeError(
+                String::New("Second argument, if specified, must be ")));
+            }
+
+            //flags
+            Local<Array> flags_ = Local<Array>::Cast(args[1]);
+            unsigned int length = flags_->Length();
+
+            for (unsigned int i = 0; i < length; i++) {
+                flags |= flags_->Get(Integer::New(i))->Int32Value();
+            }
+        }
+
         Local<Object> hyp_obj = args.This();
 
         if(!Hypervisor::HasInstance(hyp_obj)) {
