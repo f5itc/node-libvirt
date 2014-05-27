@@ -386,7 +386,7 @@ namespace NodeLibvirt {
         if(argsl > 1) {
             if(!args[1]->IsArray()) {
                 return ThrowException(Exception::TypeError(
-                String::New("Second argument, if specified, must be ")));
+                String::New("Second argument, if specified, must be an array")));
             }
 
             //flags
