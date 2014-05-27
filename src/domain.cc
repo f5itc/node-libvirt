@@ -207,13 +207,6 @@ namespace NodeLibvirt {
         NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_PMSUSPENDED);
 #endif
 
-        //virDomainCreateFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_NONE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_PAUSED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_AUTODESTROY);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_BYPASS_CACHE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_FORCE_BOOT);
-
         //virDomainSnapshotCreateFlags
         NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_REDEFINE);
         NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_CURRENT);
