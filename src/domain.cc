@@ -66,6 +66,65 @@ namespace NodeLibvirt {
     static Persistent<String> nwiface_stat_tx_errors_symbol;
     static Persistent<String> nwiface_stat_tx_drop_symbol;
 
+    char *parseString(v8::Local<v8::Value> value, const char *fallback = "") {
+        if (value->IsString()) {
+            v8::String::AsciiValue string(value);
+            char *str = (char *) malloc(string.length() + 1);
+            strcpy(str, *string);
+            return str;
+        }
+        char *str = (char *) malloc(strlen(fallback) + 1);
+        strcpy(str, fallback);
+        return str;
+    }
+
+    struct BatonBase {
+        v8::Persistent<v8::Function> callback;
+        std::string error;
+        Domain* domain;
+
+        virtual ~BatonBase() {
+            callback.Dispose();
+        }
+    };
+
+    struct GetInfoBaton : BatonBase {
+        virDomainInfo res;
+    };
+
+    struct DeleteSnapshotBaton : BatonBase {
+        const char* name;
+        unsigned int flags;
+    };
+
+    struct DestroyBaton : BatonBase {
+        int res;
+    };
+
+    struct SuspendBaton : BatonBase {
+        int res;
+    };
+
+    struct ResumeBaton : BatonBase {
+        int res;
+    };
+
+    struct RevertToSnapshotBaton : BatonBase {
+        const char* name;
+        unsigned int lookupflags;
+        unsigned int revertflags;
+    };
+
+    struct TakeSnapshotBaton : BatonBase {
+        const char* xml;
+        unsigned int flags;
+    };
+
+    struct ToXmlBaton : BatonBase {
+        unsigned int flags;
+        char* xml;
+    };
+
     void Domain::Initialize() {
         Local<FunctionTemplate> t = FunctionTemplate::New();
 
@@ -605,14 +664,100 @@ namespace NodeLibvirt {
         return scope.Close(Integer::NewFromUnsigned(id));
     }
 
-    Handle<Value> Domain::GetInfo(const Arguments& args) {
-        HandleScope scope;
+    void GetInfoAsync(uv_work_t* req) {
+        GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+
         virDomainInfo info;
+        virErrorPtr err;
+
         int ret = -1;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
         ret = virDomainGetInfo(domain->domain_, &info);
+
+        if(ret == -1) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->res = info;
+        }
+    }
+
+    void GetInfoAsyncAfter(uv_work_t* req) {
+      HandleScope scope;
+
+      GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
+      delete req;
+
+      Handle<Value> argv[2];
+
+      virDomainInfo res = baton->res;
+
+      if (!baton->error.empty()) {
+        argv[0] = Exception::Error(String::New(baton->error.c_str()));
+        argv[1] = Undefined();
+      }
+
+      else {
+        Local<Object> object = Object::New();
+
+        object->Set(state_symbol, Integer::New(res.state)); //virDomainState
+        object->Set(max_memory_symbol, Number::New(res.maxMem)); //KBytes
+        object->Set(memory_symbol, Number::New(res.memory)); //KBytes
+        object->Set(vcpus_number_symbol, Integer::New(res.nrVirtCpu));
+        object->Set(cpu_time_symbol, Number::New(res.cpuTime)); //nanoseconds
+
+        argv[0] = Undefined();
+        argv[1] = scope.Close(object);
+      }
+
+      TryCatch try_catch;
+
+      if (try_catch.HasCaught())
+        FatalException(try_catch);
+
+      baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+      delete baton;
+    }
+
+    Handle<Value> Domain::GetInfo(const Arguments& args) {
+      HandleScope scope;
+
+      // Domain context
+      Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+      // Callback
+      Local<Function> callback = Local<Function>::Cast(args[0]);
+
+      // Create baton
+      GetInfoBaton* baton = new GetInfoBaton();
+
+      // Add callback and domain
+      baton->callback = Persistent<Function>::New(callback);
+      baton->domain = domain;
+
+      // Compose req
+      uv_work_t* req = new uv_work_t;
+      req->data = baton;
+
+      // Dispatch work
+      uv_queue_work(
+        uv_default_loop(),
+        req,
+        GetInfoAsync,
+        (uv_after_work_cb)GetInfoAsyncAfter
+      );
+
+      return Undefined();
+    }
+
+/*    Handle<Value> Domain::GetInfo(const Arguments& args) {
+        HandleScope scope;
+        virDomainInfo info;
+
 
         if(ret == -1) {
             ThrowException(Error::New(virGetLastError()));
@@ -627,7 +772,7 @@ namespace NodeLibvirt {
         object->Set(cpu_time_symbol, Number::New(info.cpuTime)); //nanoseconds
 
         return scope.Close(object);
-    }
+    }*/
 
     Handle<Value> Domain::GetName(const Arguments& args) {
         HandleScope scope;
@@ -940,35 +1085,146 @@ namespace NodeLibvirt {
         return True();
     }
 
-    Handle<Value> Domain::Suspend(const Arguments& args) {
-        HandleScope scope;
+    void SuspendAsync(uv_work_t* req) {
+        SuspendBaton* baton = static_cast<SuspendBaton*>(req->data);
+        Domain *domain = baton->domain;
+        virErrorPtr err;
+
         int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
         ret = virDomainSuspend(domain->domain_);
 
         if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+        baton->res = ret;
+    }
+
+    void SuspendAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        SuspendBaton* baton = static_cast<SuspendBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
         }
 
-        return True();
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton; 
+    }
+
+    Handle<Value> Domain::Suspend(const Arguments& args) {
+        HandleScope scope;
+
+        // Domain context
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        // Create baton
+        SuspendBaton* baton = new SuspendBaton();
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[0]);
+        baton->callback = Persistent<Function>::New(callback);
+
+        // Add data
+        baton->domain = domain;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            SuspendAsync,
+            (uv_after_work_cb)SuspendAsyncAfter
+        );
+
+        return Undefined();
+    }
+
+    void ResumeAsync(uv_work_t* req) {
+        ResumeBaton* baton = static_cast<ResumeBaton*>(req->data);
+        Domain *domain = baton->domain;
+        virErrorPtr err;
+
+        int ret = -1;
+        ret = virDomainResume(domain->domain_);
+
+        if(ret == -1) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        baton->res = ret;
+    }
+
+    void ResumeAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        ResumeBaton* baton = static_cast<ResumeBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton; 
     }
 
     Handle<Value> Domain::Resume(const Arguments& args) {
         HandleScope scope;
-        int ret = -1;
-
+        ResumeBaton* baton = new ResumeBaton();
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        ret = virDomainResume(domain->domain_);
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[0]);
+        baton->callback = Persistent<Function>::New(callback);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-        return True();
+        // Add data
+        baton->domain = domain;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            ResumeAsync,
+            (uv_after_work_cb)ResumeAsyncAfter
+        );
+
+        return Undefined();
     }
 
     Handle<Value> Domain::Shutdown(const Arguments& args) {
@@ -1467,32 +1723,136 @@ namespace NodeLibvirt {
         return True();
     }
 
-    Handle<Value> Domain::Destroy(const Arguments& args) {
-        HandleScope scope;
+    void DestroyAsync(uv_work_t* req) {
+        DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
+        Domain *domain = baton->domain;
+        virErrorPtr err;
+
         int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
         ret = virDomainDestroy(domain->domain_);
 
         if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            err = virGetLastError();
+            baton->error = err->message;
         }
-        return True();
+        baton->res = ret;
+    }
+
+    void DestroyAsyncAfter(uv_work_t* req) {
+
+        DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
+    Handle<Value> Domain::Destroy(const Arguments& args) {
+        HandleScope scope;
+
+        // Domain handle
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        // Create baton
+        DestroyBaton* baton = new DestroyBaton();
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[0]);
+        baton->callback = Persistent<Function>::New(callback);
+
+        // Add data
+        baton->domain = domain;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            DestroyAsync,
+            (uv_after_work_cb)DestroyAsyncAfter
+        );
+
+
+        return Undefined();
+    }
+
+    void ToXmlAsync(uv_work_t* req) {
+        ToXmlBaton* baton = static_cast<ToXmlBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+        unsigned int flags = baton->flags;
+
+        virErrorPtr err;
+        char* xml_ = NULL;
+
+        xml_ = virDomainGetXMLDesc(domain->domain_, flags);
+
+        if(xml_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            //Local<String> xml = String::New(xml_);
+            baton->xml = xml_;
+        }
+        //free(xml_);
+        //return scope.Close(xml);
+    }
+
+    void ToXmlAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        ToXmlBaton* baton = static_cast<ToXmlBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            argv[0] = Undefined();
+            argv[1] = String::New(baton->xml);
+        }
+
+        TryCatch try_catch;
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
     }
 
     Handle<Value> Domain::ToXml(const Arguments& args) {
         HandleScope scope;
-        char* xml_ = NULL;
-        int flags = 0;
 
+        // Flags
+        int flags = 0;
         if(args.Length() == 0 || !args[0]->IsArray()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify an array as argument to invoke this function")));
+            String::New("First argument must be an array of flags")));
         }
-
-        //flags
         Local<Array> flags_ = Local<Array>::Cast(args[0]);
         unsigned int length = flags_->Length();
 
@@ -1500,19 +1860,38 @@ namespace NodeLibvirt {
             flags |= flags_->Get(Integer::New(i))->Int32Value();
         }
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        xml_ = virDomainGetXMLDesc(domain->domain_, flags);
-
-        if(xml_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        if(args.Length() == 1 || !args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("Second argument must be a callback function")));
         }
 
-        Local<String> xml = String::New(xml_);
+        // Domain context
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        free(xml_);
+        // Create baton
+        ToXmlBaton* baton = new ToXmlBaton();
 
-        return scope.Close(xml);
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[1]);
+        baton->callback = Persistent<Function>::New(callback);
+
+        // Add data to baton
+        baton->domain = domain;
+        baton->flags = flags;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            ToXmlAsync,
+            (uv_after_work_cb)ToXmlAsyncAfter
+        );
+
+        return Undefined();
     }
 
     Handle<Value> Domain::GetJobInfo(const Arguments& args) {
@@ -2171,18 +2550,84 @@ namespace NodeLibvirt {
         return ret == 1 ? True() : False();
     }
 
+    void RevertToSnapshotAsync(uv_work_t* req) {
+
+        RevertToSnapshotBaton* baton = static_cast<RevertToSnapshotBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+        const char *name = baton->name;
+        //unsigned int lookupflags = baton->lookupflags;
+        unsigned int revertflags = baton->revertflags;
+
+        virDomainSnapshotPtr snapshot = NULL;
+        virErrorPtr err;
+
+        int ret = -1;
+
+        snapshot = virDomainSnapshotLookupByName(domain->domain_, name, baton->lookupflags);
+
+        if(snapshot == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            ret = virDomainRevertToSnapshot(snapshot, revertflags);
+
+            if(ret == -1) {
+                err = virGetLastError();
+                baton->error = err->message;
+            }
+
+            else {
+                virDomainSnapshotFree(snapshot);
+            }
+        }
+    }
+
+    void RevertToSnapshotAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        RevertToSnapshotBaton* baton = static_cast<RevertToSnapshotBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
     Handle<Value> Domain::RevertToSnapshot(const Arguments& args) {
         HandleScope scope;
-        virDomainSnapshotPtr snapshot = NULL;
+
+        // Domain context
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
         unsigned int lookupflags = 0;
         unsigned int revertflags = 0;
-        int ret = -1;
 
         if(args.Length() == 0 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
             String::New("You must specify a string as argument to invoke this function")));
         }
-        String::Utf8Value name(args[0]->ToString());
+
+        // Domain name
+        const char *name = parseString(args[0]);
 
         if (args.Length() > 1) {
             if (!args[1]->IsObject()) {
@@ -2198,26 +2643,146 @@ namespace NodeLibvirt {
             }
         }
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, lookupflags);
+        // Create baton
+        RevertToSnapshotBaton* baton = new RevertToSnapshotBaton();
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[2]);
+        baton->callback = Persistent<Function>::New(callback);
+
+        // Add data to baton
+        baton->domain = domain;
+        baton->name = name;
+        baton->lookupflags = lookupflags;
+        baton->revertflags = revertflags;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            RevertToSnapshotAsync,
+            (uv_after_work_cb)RevertToSnapshotAsyncAfter
+        );
+
+        return Undefined();
+    }
+
+    void TakeSnapshotAsync(uv_work_t* req) {
+
+        TakeSnapshotBaton* baton = static_cast<TakeSnapshotBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+        const char *xml = baton->xml;
+        unsigned int flags = baton->flags;
+
+        virDomainSnapshotPtr snapshot = NULL;
+        virErrorPtr err;
+
+        snapshot = virDomainSnapshotCreateXML(domain->domain_, xml, flags);
+
         if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            err = virGetLastError();
+            baton->error = err->message;
         }
-
-        ret = virDomainRevertToSnapshot(snapshot, revertflags);
-
-        if(ret == -1) {
+        
+        else {
             virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return False();
         }
-        virDomainSnapshotFree(snapshot);
+    }
 
-        return True();
+    void TakeSnapshotAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        TakeSnapshotBaton* baton = static_cast<TakeSnapshotBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        } 
+
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
     }
 
     Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
+        HandleScope scope;
+
+        // Domain context
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        // XML 
+        const char *xml = parseString(args[0]);
+
+        // Flags
+        unsigned int flags = 0;
+
+        // Parse args
+        if(args.Length() > 0) {
+            if (!args[0]->IsString()) {
+                return ThrowException(Exception::TypeError(
+                String::New("First argument, if provided, must be a string")));
+            }
+
+            if (args.Length() > 1) {
+                if (!args[1]->IsObject()) {
+                    return ThrowException(Exception::TypeError(
+                    String::New("Second argument, if provided, must be an object")));
+                }
+
+                Local<Array> flags_ = Local<Array>::Cast(args[1]);
+                unsigned int length = flags_->Length();
+
+                for (unsigned int i = 0; i < length; i++) {
+                    flags |= flags_->Get(Integer::New(i))->Int32Value();
+                }
+            }
+        }
+
+        // Create baton
+        TakeSnapshotBaton* baton = new TakeSnapshotBaton();
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[2]);
+        baton->callback = Persistent<Function>::New(callback);
+
+        // Add data to baton
+        baton->domain = domain; 
+        baton->flags = flags;
+        baton->xml = xml;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            TakeSnapshotAsync,
+            (uv_after_work_cb)TakeSnapshotAsyncAfter
+        );
+
+        return Undefined();
+    }
+
+    /*Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
         HandleScope scope;
         virDomainSnapshotPtr snapshot = NULL;
         unsigned int flags = 0;
@@ -2259,7 +2824,7 @@ namespace NodeLibvirt {
         virDomainSnapshotFree(snapshot);
 
         return True();
-    }
+    }*/
 
     Handle<Value> Domain::GetCurrentSnapshot(const Arguments& args) {
         HandleScope scope;
@@ -2290,31 +2855,117 @@ namespace NodeLibvirt {
         return scope.Close(xml);
     }
 
+    void DeleteSnapshotAsync(uv_work_t* req) {
+
+        DeleteSnapshotBaton* baton = static_cast<DeleteSnapshotBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+        const char *name = baton->name;
+        unsigned int flags = baton->flags;
+
+        virDomainSnapshotPtr snapshot = NULL;
+        virErrorPtr err;
+
+        snapshot = virDomainSnapshotLookupByName(domain->domain_, name, flags);
+
+        if(snapshot == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            int ret = virDomainSnapshotDelete(snapshot, flags);
+            if(ret == -1) {
+                err = virGetLastError();
+                baton->error = err->message;
+            }
+
+            else {
+                virDomainSnapshotFree(snapshot);
+            }
+        }
+    }
+
+    void DeleteSnapshotAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        DeleteSnapshotBaton* baton = static_cast<DeleteSnapshotBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
     Handle<Value> Domain::DeleteSnapshot(const Arguments& args) {
         HandleScope scope;
+
+        // Domain context
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        // Flags
         unsigned int flags = 0;
-        virDomainSnapshotPtr snapshot = NULL;
 
         if(args.Length() == 0 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value name(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, flags);
-        if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            String::New("First argument must be a string")));
         }
 
-        int ret = virDomainSnapshotDelete(snapshot, flags);
-        if(ret == -1) {
-            virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+        // Domain name
+        const char *name = parseString(args[0]);
+
+        if (args.Length() > 1) {
+            if (!args[1]->IsObject()) {
+            return ThrowException(Exception::TypeError(
+                String::New("Second argument must be an object")));
+            }
+
+            Local<Array> flags_ = Local<Array>::Cast(args[1]);
+            unsigned int length = flags_->Length();
+
+            for (unsigned int i = 0; i < length; i++) {
+                flags |= flags_->Get(Integer::New(i))->Int32Value();
+            }
         }
-        virDomainSnapshotFree(snapshot);
+
+        // Create baton
+        DeleteSnapshotBaton* baton = new DeleteSnapshotBaton();
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[2]);
+        baton->callback = Persistent<Function>::New(callback);
+
+        // Add data to baton
+        baton->domain = domain;
+        baton->name = name;
+        baton->flags = flags;
+        
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        uv_queue_work(
+          uv_default_loop(),
+          req,
+          DeleteSnapshotAsync,
+          (uv_after_work_cb)DeleteSnapshotAsyncAfter
+        );
 
         return True();
     }

@@ -26,6 +26,7 @@ namespace NodeLibvirt {
                 }
             }
             virDomainPtr domain() const;
+            virDomainPtr domain_;
         protected:
             static Handle<Value> Create(const Arguments& args);
             static Handle<Value> LookupById(const Arguments& args);
@@ -93,7 +94,7 @@ namespace NodeLibvirt {
             static Handle<Value> GetSnapshots(const Arguments& args);
 
         private:
-            virDomainPtr domain_;
+            //virDomainPtr domain_;
             static Persistent<FunctionTemplate> constructor_template;
     };
 
