@@ -27,6 +27,7 @@ namespace NodeLibvirt {
             }
             virDomainPtr domain() const;
             virDomainPtr domain_;
+
         protected:
             static Handle<Value> Create(const Arguments& args);
             static Handle<Value> LookupById(const Arguments& args);

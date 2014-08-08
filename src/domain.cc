@@ -88,6 +88,16 @@ namespace NodeLibvirt {
         }
     };
 
+    struct AttachDeviceBaton : BatonBase {
+        const char* xml;
+        unsigned int flags;
+    };
+
+    struct DetachDeviceBaton : BatonBase {
+        const char* xml;
+        unsigned int flags;
+    };
+
     struct GetInfoBaton : BatonBase {
         virDomainInfo res;
     };
@@ -753,26 +763,6 @@ namespace NodeLibvirt {
 
       return Undefined();
     }
-
-/*    Handle<Value> Domain::GetInfo(const Arguments& args) {
-        HandleScope scope;
-        virDomainInfo info;
-
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        Local<Object> object = Object::New();
-
-        object->Set(state_symbol, Integer::New(info.state)); //virDomainState
-        object->Set(max_memory_symbol, Number::New(info.maxMem)); //KBytes
-        object->Set(memory_symbol, Number::New(info.memory)); //KBytes
-        object->Set(vcpus_number_symbol, Integer::New(info.nrVirtCpu));
-        object->Set(cpu_time_symbol, Number::New(info.cpuTime)); //nanoseconds
-
-        return scope.Close(object);
-    }*/
 
     Handle<Value> Domain::GetName(const Arguments& args) {
         HandleScope scope;
@@ -1596,26 +1586,72 @@ namespace NodeLibvirt {
         return True();
     }
 
-    Handle<Value> Domain::AttachDevice(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
+    void AttachDeviceAsync(uv_work_t* req) {
+        AttachDeviceBaton* baton = static_cast<AttachDeviceBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+        const char *xml = baton->xml;
+        unsigned int flags = baton->flags;
+
+        virErrorPtr err;
         int ret = -1;
 
+        if(flags > 0) {
+            ret = virDomainAttachDeviceFlags(domain->domain_, xml, flags);
+        } else {
+            ret = virDomainAttachDevice(domain->domain_, xml);
+        }
+
+        if(ret == -1) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+    }
+
+    void AttachDeviceAsyncAfter(uv_work_t* req) {
+        AttachDeviceBaton* baton = static_cast<AttachDeviceBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
+    Handle<Value> Domain::AttachDevice(const Arguments& args) {
+        HandleScope scope;
+
+        unsigned int flags = 0;
         int argsl = args.Length();
 
-        if(argsl == 0 || !args[0]->IsString()) {
+        if(argsl < 1 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string")));
+            String::New("First argument must be string of device XML")));
         }
 
-        if(argsl == 2 && !args[1]->IsArray()) {
+        // XML
+        const char *xml = parseString(args[0]);
+
+        if(argsl < 2 || !args[1]->IsArray()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify an object with flags")));
+            String::New("Second argument must be array of flags")));
         }
 
-        String::Utf8Value xml(args[0]->ToString());
-
-        //flags
+        // Parse flags
         Local<Array> flags_ = Local<Array>::Cast(args[1]);
         unsigned int length = flags_->Length();
 
@@ -1623,42 +1659,107 @@ namespace NodeLibvirt {
             flags |= flags_->Get(Integer::New(i))->Int32Value();
         }
 
+        if(argsl < 3 || !args[2]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("Third argument must be a callback function")));
+        }
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[3]);
+
+        // Domain context
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
+        // Create baton
+        AttachDeviceBaton* baton = new AttachDeviceBaton();
+
+        // Add data to baton
+        baton->callback = Persistent<Function>::New(callback);
+        baton->domain = domain;
+        baton->flags = flags;
+        baton->xml = xml;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            AttachDeviceAsync,
+            (uv_after_work_cb)AttachDeviceAsyncAfter
+        );
+
+        return Undefined();
+    }
+
+    void DetachDeviceAsync(uv_work_t* req) {
+        DetachDeviceBaton* baton = static_cast<DetachDeviceBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+        const char *xml = baton->xml;
+        unsigned int flags = baton->flags;
+
+        virErrorPtr err;
+        int ret = -1;
+
         if(flags > 0) {
-            ret = virDomainAttachDeviceFlags(domain->domain_, (const char *) *xml, flags);
+            ret = virDomainAttachDeviceFlags(domain->domain_, xml, flags);
         } else {
-            ret = virDomainAttachDevice(domain->domain_, (const char *) *xml);
+            ret = virDomainAttachDevice(domain->domain_, xml);
         }
 
         if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+    }
+
+    void DetachDeviceAsyncAfter(uv_work_t* req) {
+        DetachDeviceBaton* baton = static_cast<DetachDeviceBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
         }
 
-        return True();
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
     }
 
     Handle<Value> Domain::DetachDevice(const Arguments& args) {
         HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
 
+        unsigned int flags = 0;
         int argsl = args.Length();
 
-        if(argsl == 0 || !args[0]->IsString()) {
+        if(argsl < 1 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string")));
+            String::New("First argument must be string of device XML")));
         }
 
-        if(argsl == 2 && !args[1]->IsArray()) {
+        // XML
+        const char *xml = parseString(args[0]);
+
+        if(argsl < 2 || !args[1]->IsArray()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify an object with flags")));
+            String::New("Second argument must be array of flags")));
         }
 
-        String::Utf8Value xml(args[0]->ToString());
-
-        //flags
+        // Parse flags
         Local<Array> flags_ = Local<Array>::Cast(args[1]);
         unsigned int length = flags_->Length();
 
@@ -1666,19 +1767,39 @@ namespace NodeLibvirt {
             flags |= flags_->Get(Integer::New(i))->Int32Value();
         }
 
+        if(argsl < 3 || !args[2]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("Third argument must be a callback function")));
+        }
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[3]);
+
+        // Domain context
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(flags > 0) {
-            ret = virDomainDetachDeviceFlags(domain->domain_, (const char *) *xml, flags);
-        } else {
-            ret = virDomainDetachDevice(domain->domain_, (const char *) *xml);
-        }
+        // Create baton
+        DetachDeviceBaton* baton = new DetachDeviceBaton();
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-        return True();
+        // Add data to baton
+        baton->callback = Persistent<Function>::New(callback);
+        baton->domain = domain;
+        baton->flags = flags;
+        baton->xml = xml;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            DetachDeviceAsync,
+            (uv_after_work_cb)DetachDeviceAsyncAfter
+        );
+
+        return Undefined();
     }
 
     Handle<Value> Domain::UpdateDevice(const Arguments& args) {
