@@ -40,8 +40,6 @@ namespace NodeLibvirt {
         context->Global()->Set(String::NewSymbol("libvirt"), target);
     }
 
-    
-
     // Extracts a C string from a V8 Utf8Value.
     const char* ToCString(const String::Utf8Value& value) {
         return *value ? *value : "<string conversion failed>";
