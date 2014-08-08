@@ -66,7 +66,7 @@ namespace NodeLibvirt {
     static Persistent<String> nwiface_stat_tx_errors_symbol;
     static Persistent<String> nwiface_stat_tx_drop_symbol;
 
-    char *parseString(v8::Local<v8::Value> value, const char *fallback = "") {
+    const char *parseString(v8::Local<v8::Value> value, const char *fallback = "") {
         if (value->IsString()) {
             v8::String::AsciiValue string(value);
             char *str = (char *) malloc(string.length() + 1);
