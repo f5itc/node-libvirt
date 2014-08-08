@@ -1,5 +1,6 @@
 // Copyright 2010, Camilo Aguilar. Cloudescape, LLC.
 #include <stdlib.h>
+#include <string.h>
 #include "storage_volume.h"
 
 namespace NodeLibvirt {
@@ -9,6 +10,39 @@ namespace NodeLibvirt {
     static Persistent<String> info_type_symbol;
     static Persistent<String> info_capacity_symbol;
     static Persistent<String> info_allocation_symbol;
+
+    const char *parseStr(v8::Local<v8::Value> value, const char *fallback = "") {
+        if (value->IsString()) {
+            v8::String::AsciiValue string(value);
+            char *str = (char *) malloc(string.length() + 1);
+            strcpy(str, *string);
+            return str;
+        }
+        char *str = (char *) malloc(strlen(fallback) + 1);
+        strcpy(str, fallback);
+        return str;
+    }
+
+    struct BatonBase {
+        v8::Persistent<v8::Function> callback;
+        std::string error;
+
+        virtual ~BatonBase() {
+            callback.Dispose();
+        }
+    };
+
+    struct LookupByNameBaton : BatonBase {
+        const char* name;
+        StorageVolume* volume;
+        StoragePool* pool;
+    };
+
+    struct LookupByPathBaton : BatonBase {
+        Hypervisor* hypervisor;
+        const char* path;
+        StorageVolume* volume;
+    };
 
     void StorageVolume::Initialize() {
         HandleScope scope;
@@ -215,6 +249,58 @@ namespace NodeLibvirt {
         return scope.Close(xml);
     }
 
+    void LookupByNameAsync(uv_work_t* req) {
+        LookupByNameBaton* baton = static_cast<LookupByNameBaton*>(req->data);
+
+        StoragePool *pool = baton->pool;
+        const char *name = baton->name;
+
+        StorageVolume *volume = new StorageVolume();
+        virErrorPtr err;
+
+        volume->volume_ = virStorageVolLookupByName(pool->pool(), name);
+
+        if(volume->volume_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->volume = volume;
+        }
+    }
+
+    void LookupByNameAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        LookupByNameBaton* baton = static_cast<LookupByNameBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            StorageVolume *volume = baton->volume;
+            Local<Object> volume_obj = volume->constructor_template->GetFunction()->NewInstance();
+            volume->Wrap(volume_obj);
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(volume_obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+          FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton; 
+    }
+
     Handle<Value> StorageVolume::LookupByName(const Arguments& args) {
         HandleScope scope;
 
@@ -230,23 +316,34 @@ namespace NodeLibvirt {
             String::New("You must specify a StoragePool instance")));
         }
 
-        String::Utf8Value name(args[0]->ToString());
+        const char *name = parseStr(args[0]);
 
         StoragePool *pool = ObjectWrap::Unwrap<StoragePool>(pool_obj);
 
-        StorageVolume *volume = new StorageVolume();
-        volume->volume_ = virStorageVolLookupByName(pool->pool(), (const char *) *name);
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[1]);
 
-        if(volume->volume_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        // Create baton
+        LookupByNameBaton* baton = new LookupByNameBaton();
 
-        Local<Object> volume_obj = volume->constructor_template->GetFunction()->NewInstance();
+        // Add callback and domain
+        baton->callback = Persistent<Function>::New(callback);
+        baton->pool = pool;
+        baton->name = name;
 
-        volume->Wrap(volume_obj);
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
 
-        return scope.Close(volume_obj);
+        // Dispatch work
+        uv_queue_work(
+          uv_default_loop(),
+          req,
+          LookupByNameAsync,
+          (uv_after_work_cb)LookupByNameAsyncAfter
+        );
+
+        return Undefined();
     }
 
     Handle<Value> StorageVolume::LookupByKey(const Arguments& args) {
@@ -283,8 +380,60 @@ namespace NodeLibvirt {
         return scope.Close(volume_obj);
     }
 
-    Handle<Value> StorageVolume::LookupByPath(const Arguments& args) {
+    void LookupByPathAsync(uv_work_t* req) {
+
+        LookupByPathBaton* baton = static_cast<LookupByPathBaton*>(req->data);
+
+        Hypervisor *hypervisor = baton->hypervisor;
+        const char *path = baton->path;
+
+        StorageVolume *volume = new StorageVolume();
+        virErrorPtr err;
+
+        volume->volume_ = virStorageVolLookupByPath(hypervisor->connection(), path);
+
+        if(volume->volume_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->volume = volume;
+        }
+    }
+
+    void LookupByPathAsyncAfter(uv_work_t* req) {
         HandleScope scope;
+
+        LookupByPathBaton* baton = static_cast<LookupByPathBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            StorageVolume *volume = baton->volume;
+            Local<Object> volume_obj = volume->constructor_template->GetFunction()->NewInstance();
+            volume->Wrap(volume_obj);
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(volume_obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+          FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
+    Handle<Value> StorageVolume::LookupByPath(const Arguments& args) {
 
         if(args.Length() == 0 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
@@ -298,23 +447,32 @@ namespace NodeLibvirt {
             String::New("You must specify a Hypervisor instance")));
         }
 
-        String::Utf8Value path(args[0]->ToString());
+        const char *path = parseStr(args[0]);
 
         Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        StorageVolume *volume = new StorageVolume();
-        volume->volume_ = virStorageVolLookupByPath(hypervisor->connection(), (const char *) *path);
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[1]);
 
-        if(volume->volume_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        // Create baton and add data
+        LookupByPathBaton* baton = new LookupByPathBaton();
+        baton->callback = Persistent<Function>::New(callback);
+        baton->hypervisor = hypervisor;
+        baton->path = path;
 
-        Local<Object> volume_obj = volume->constructor_template->GetFunction()->NewInstance();
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
 
-        volume->Wrap(volume_obj);
+        // Dispatch work
+        uv_queue_work(
+          uv_default_loop(),
+          req,
+          LookupByPathAsync,
+          (uv_after_work_cb)LookupByPathAsyncAfter
+        );
 
-        return scope.Close(volume_obj);
+        return Undefined();
     }
 
     Handle<Value> StorageVolume::Clone(const Arguments& args) {

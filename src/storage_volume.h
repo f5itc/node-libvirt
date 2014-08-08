@@ -36,6 +36,11 @@ namespace NodeLibvirt {
             static Handle<Value> Delete(const Arguments& args);
             static Handle<Value> Clone(const Arguments& args);
 
+            friend void LookupByPathAsync(uv_work_t* req);
+            friend void LookupByPathAsyncAfter(uv_work_t* req);
+            friend void LookupByNameAsync(uv_work_t* req);
+            friend void LookupByNameAsyncAfter(uv_work_t* req);
+
         private:
             virStorageVolPtr volume_;
             static Persistent<FunctionTemplate> constructor_template;
