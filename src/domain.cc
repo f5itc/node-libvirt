@@ -93,6 +93,13 @@ namespace NodeLibvirt {
         unsigned int flags;
     };
 
+    struct CreateDomainBaton : BatonBase {
+        const char* xml;
+        unsigned int flags;
+        Hypervisor* hypervisor;
+        Domain* domain;
+    };
+
     struct DetachDeviceBaton : BatonBase {
         const char* xml;
         unsigned int flags;
@@ -447,35 +454,80 @@ namespace NodeLibvirt {
         return domain_;
     }
 
+    void CreateDomainAsync(uv_work_t* req) {
+
+        CreateDomainBaton* baton = static_cast<CreateDomainBaton*>(req->data);
+
+        Hypervisor *hypervisor = baton->hypervisor;
+        const char *xml = baton->xml;
+        unsigned int flags = baton->flags;
+
+        virErrorPtr err;
+        Domain *domain = new Domain();
+
+        domain->domain_ = virDomainCreateXML(hypervisor->connection(), xml, flags);
+
+        if(domain->domain_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->domain = domain;
+        }
+    }
+
+    void CreateDomainAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        CreateDomainBaton* baton = static_cast<CreateDomainBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            Domain *domain = baton->domain;
+            Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+            domain->Wrap(domain_obj);
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(domain_obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+          FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
     Handle<Value> Domain::Create(const Arguments& args) {
         HandleScope scope;
         unsigned int flags = 0;
-
-        int argsl = args.Length();
-
-        if(argsl == 0) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify at least one argument")));
-        }
 
         if(!args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
             String::New("You must specify a string as first argument")));
         }
 
-        if(argsl > 1) {
-            if(!args[1]->IsArray()) {
-                return ThrowException(Exception::TypeError(
-                String::New("Second argument, if specified, must be an array")));
-            }
+        if(!args[1]->IsArray()) {
+            return ThrowException(Exception::TypeError(
+            String::New("Second argument, if specified, must be an array")));
+        }
 
-            //flags
-            Local<Array> flags_ = Local<Array>::Cast(args[1]);
-            unsigned int length = flags_->Length();
+        // Flags
+        Local<Array> flags_ = Local<Array>::Cast(args[1]);
+        unsigned int length = flags_->Length();
 
-            for (unsigned int i = 0; i < length; i++) {
-                flags |= flags_->Get(Integer::New(i))->Int32Value();
-            }
+        for (unsigned int i = 0; i < length; i++) {
+            flags |= flags_->Get(Integer::New(i))->Int32Value();
         }
 
         Local<Object> hyp_obj = args.This();
@@ -484,22 +536,35 @@ namespace NodeLibvirt {
             return ThrowException(Exception::TypeError(
             String::New("You must specify a Hypervisor object instance")));
         }
-        String::Utf8Value xml(args[0]->ToString());
 
         Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        Domain *domain = new Domain();
-        domain->domain_ = virDomainCreateXML(hypervisor->connection(), (const char *) *xml, flags);
+        const char *xml = parseString(args[0]);
 
-        if(domain->domain_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[2]);
 
-        Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
-        domain->Wrap(domain_obj);
+        // Create baton; add callback, hypervisor, flags, and xml
+        CreateDomainBaton* baton = new CreateDomainBaton();
 
-        return scope.Close(domain_obj);
+        baton->callback = Persistent<Function>::New(callback);
+        baton->hypervisor = hypervisor;
+        baton->flags = flags;
+        baton->xml = xml;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t();
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            CreateDomainAsync,
+            (uv_after_work_cb)CreateDomainAsyncAfter
+        );
+
+        return scope.Close(Undefined());
     }
 
     Handle<Value> Domain::Define(const Arguments& args) {
