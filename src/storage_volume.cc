@@ -343,7 +343,7 @@ namespace NodeLibvirt {
           (uv_after_work_cb)LookupByNameAsyncAfter
         );
 
-        return Undefined();
+        return scope.Close(Undefined());
     }
 
     Handle<Value> StorageVolume::LookupByKey(const Arguments& args) {
