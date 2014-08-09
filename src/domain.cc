@@ -111,8 +111,10 @@ namespace NodeLibvirt {
         int res;
     };
 
-    struct SuspendBaton : BatonBase {
-        int res;
+    struct LookupDomainByNameBaton : BatonBase {
+        const char* name;
+        Hypervisor* hypervisor;
+        Domain* domain;
     };
 
     struct ResumeBaton : BatonBase {
@@ -123,6 +125,10 @@ namespace NodeLibvirt {
         const char* name;
         unsigned int lookupflags;
         unsigned int revertflags;
+    };
+
+    struct SuspendBaton : BatonBase {
+        int res;
     };
 
     struct TakeSnapshotBaton : BatonBase {
@@ -587,12 +593,63 @@ namespace NodeLibvirt {
         return scope.Close(domain_obj);
     }
 
+    void LookupDomainByNameAsync(uv_work_t* req) {
+        LookupDomainByNameBaton* baton = static_cast<LookupDomainByNameBaton*>(req->data);
+
+        const char* name = baton->name;
+        Hypervisor *hypervisor = baton->hypervisor;
+        virErrorPtr err;
+
+        Domain *domain = new Domain();
+        domain->domain_ = virDomainLookupByName(hypervisor->connection(), name);
+
+        if(domain->domain_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->domain = domain;
+        }
+    }
+
+    void LookupDomainByNameAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        LookupDomainByNameBaton* baton = static_cast<LookupDomainByNameBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            Domain *domain = baton->domain;
+            Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+            domain->Wrap(domain_obj);
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(domain_obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+          FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
     Handle<Value> Domain::LookupByName(const Arguments& args) {
         HandleScope scope;
 
         if(args.Length() == 0 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a valid Domain name.")));
+            String::New("You must specify a domain name as a string")));
         }
 
         Local<Object> hyp_obj = args.This();
@@ -602,23 +659,35 @@ namespace NodeLibvirt {
             String::New("You must specify a Hypervisor instance")));
         }
 
-        String::Utf8Value name(args[0]->ToString());
+        const char* name = parseString(args[0]);
 
+        // Unwrap hypervisor
         Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        Domain *domain = new Domain();
-        domain->domain_ = virDomainLookupByName(hypervisor->connection(), (const char *) *name);
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[1]);
 
-        if(domain->domain_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        // Create baton
+        LookupDomainByNameBaton* baton = new LookupDomainByNameBaton();
 
-        Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+        // Add callback, name, and hypervisor
+        baton->callback = Persistent<Function>::New(callback);
+        baton->name = name;
+        baton->hypervisor = hypervisor;
 
-        domain->Wrap(domain_obj);
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
 
-        return scope.Close(domain_obj);
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            LookupDomainByNameAsync,
+            (uv_after_work_cb)LookupDomainByNameAsyncAfter
+        );
+
+        return scope.Close(Undefined());
     }
 
     Handle<Value> Domain::LookupByUUID(const Arguments& args) {
@@ -1105,7 +1174,7 @@ namespace NodeLibvirt {
 
         else {
             argv[0] = Undefined();
-            argv[1] = True();
+            argv[1] = scope.Close(True());
         }
 
         TryCatch try_catch;
@@ -1144,7 +1213,7 @@ namespace NodeLibvirt {
             (uv_after_work_cb)SuspendAsyncAfter
         );
 
-        return Undefined();
+        return scope.Close(Undefined());
     }
 
     void ResumeAsync(uv_work_t* req) {
@@ -1178,7 +1247,7 @@ namespace NodeLibvirt {
 
         else {
             argv[0] = Undefined();
-            argv[1] = True();
+            argv[1] = scope.Close(True());
         }
 
         TryCatch try_catch;
@@ -1191,7 +1260,7 @@ namespace NodeLibvirt {
     }
 
     Handle<Value> Domain::Resume(const Arguments& args) {
-        HandleScope scope;
+
         ResumeBaton* baton = new ResumeBaton();
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
@@ -1846,6 +1915,7 @@ namespace NodeLibvirt {
 
     void DestroyAsync(uv_work_t* req) {
         DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
+
         Domain *domain = baton->domain;
         virErrorPtr err;
 
@@ -1860,6 +1930,7 @@ namespace NodeLibvirt {
     }
 
     void DestroyAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
 
         DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
         delete req;
@@ -1873,7 +1944,7 @@ namespace NodeLibvirt {
 
         else {
             argv[0] = Undefined();
-            argv[1] = True();
+            argv[1] = scope.Close(True());
         }
 
         TryCatch try_catch;
@@ -1912,8 +1983,7 @@ namespace NodeLibvirt {
             (uv_after_work_cb)DestroyAsyncAfter
         );
 
-
-        return Undefined();
+        return scope.Close(Undefined());
     }
 
     void ToXmlAsync(uv_work_t* req) {
@@ -2830,7 +2900,7 @@ namespace NodeLibvirt {
 
         else {
             argv[0] = Undefined();
-            argv[1] = True();
+            argv[1] = scope.Close(True());
         }
 
         TryCatch try_catch;
@@ -2900,7 +2970,7 @@ namespace NodeLibvirt {
             (uv_after_work_cb)TakeSnapshotAsyncAfter
         );
 
-        return Undefined();
+        return scope.Close(Undefined());
     }
 
     /*Handle<Value> Domain::TakeSnapshot(const Arguments& args) {

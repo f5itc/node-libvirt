@@ -94,6 +94,9 @@ namespace NodeLibvirt {
             static Handle<Value> LookupSnapshotByName(const Arguments& args);
             static Handle<Value> GetSnapshots(const Arguments& args);
 
+            friend void LookupDomainByNameAsync(uv_work_t* req);
+            friend void LookupDomainByNameAsyncAfter(uv_work_t* req);
+
         private:
             //virDomainPtr domain_;
             static Persistent<FunctionTemplate> constructor_template;
