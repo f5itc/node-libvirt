@@ -2670,7 +2670,7 @@ namespace NodeLibvirt {
                 String::New("Fourth argument, if specified, must be an object")));
             }
 
-            Local<Array> flags_ = Local<Array>::Cast(args[1]);
+            Local<Array> flags_ = Local<Array>::Cast(args[3]);
             unsigned int length = flags_->Length();
 
             for (unsigned int i = 0; i < length; i++) {
