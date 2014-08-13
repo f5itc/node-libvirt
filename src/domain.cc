@@ -87,6 +87,12 @@ namespace NodeLibvirt {
         unsigned int flags;
     };
 
+    struct BlockPullBaton : BatonBase {
+        const char* disk;
+        unsigned int bandwidth;
+        unsigned int flags;
+    };
+
     struct CreateDomainBaton : BatonBase {
         const char* xml;
         unsigned int flags;
@@ -2605,40 +2611,165 @@ namespace NodeLibvirt {
         return scope.Close(buffer->handle_);
     }
 
-    Handle<Value> Domain::BlockPull(const Arguments& args) {
-        HandleScope scope;
-		    unsigned int bandwidth = 0;
-		    unsigned int flags = 0;
+    void BlockPullAsync(uv_work_t* req) {
+        BlockPullBaton* baton = static_cast<BlockPullBaton*>(req->data);
 
-        if(args.Length() < 2) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify two arguments to invoke this function")));
-        }
+        Domain *domain         = baton->domain;
+        const char *disk       = baton->disk;
+        unsigned int flags     = baton->flags;
+        unsigned int bandwidth = baton->bandwidth;
 
-        if(!args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string in the first argument")));
-        }
+        virErrorPtr err;
 
-        if(!args[1]->IsNumber()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a number in the second argument")));
-        }
-
-        String::Utf8Value path(args[0]->ToString());
-
-        bandwidth = args[1]->NumberValue();
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        int ret = virDomainBlockPull(domain->domain_, (const char *) *path, bandwidth, flags);
+        int ret = virDomainBlockPull(domain->domain_, disk, bandwidth, flags);
 
         if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+    }
+
+    void BlockPullAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        BlockPullBaton* baton = static_cast<BlockPullBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
         }
 
-        return True();
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+          FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
+    Handle<Value> Domain::BlockPull(const Arguments& args) {
+        HandleScope scope;
+
+        Local<Object> options_;
+        Local<Function> callback_;
+
+        unsigned int bandwidth = 0;
+        unsigned int flags = 0;
+        const char* disk = "vda";
+
+        // If only callback has been specified, use defaults
+        if(args[0]->IsFunction()) {
+            callback_ = Local<Function>::Cast(args[0]);
+        }
+
+        // If options have been specified
+        else if(args[0]->IsObject()) {
+
+            // If callback has not been specified
+            if(!args[1]->IsFunction()) {
+                ThrowException(Exception::TypeError(
+                    String::New("Second argument must be a function"))
+                );
+                return scope.Close(Undefined());
+            }
+
+            options_  = Local<Object>::Cast(args[0]);
+            callback_ = Local<Function>::Cast(args[1]);
+
+            // Supported options
+            Handle<Value> disk_      = options_->Get(String::New("disk"));
+            Handle<Value> flags_     = options_->Get(String::New("flags"));
+            Handle<Value> bandwidth_ = options_->Get(String::New("bandwidth"));
+
+            // When disk option is specified
+            if (!disk_->IsUndefined()) {
+
+                // If disk option is not a string
+                if (!disk_->IsString()) {
+                    ThrowException(Exception::TypeError(
+                        String::New("Disk must be a string"))
+                    );
+                    return scope.Close(Undefined());
+                }
+
+                disk = parseString(disk_->ToString());
+            }
+
+            // When flags option is specified
+            if (!flags_->IsUndefined()) {
+
+                // If flags option is not an array
+                if (!flags_->IsArray()) {
+                    ThrowException(Exception::TypeError(
+                        String::New("Flags, must be an array"))
+                    );
+                    return scope.Close(Undefined());
+                }
+
+                Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
+                unsigned int length = flagsArr_->Length();
+
+                for (unsigned int i = 0; i < length; i++) {
+                    flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
+                }
+            }
+
+            // When bandwidth option is specified
+            if (!bandwidth_->IsUndefined()) {
+
+                if (!bandwidth_->IsNumber()) {
+                    ThrowException(Exception::TypeError(
+                        String::New("Bandwidth must be a number"))
+                    );
+                    return scope.Close(Undefined());
+                }
+
+                //bandwidth = bandwidth_->ToUint32();
+                bandwidth = bandwidth_->NumberValue();
+            }
+        }
+
+        // If first argument is neither an object nor a function
+        else {
+            return ThrowException(Exception::TypeError(
+            String::New("First argument must be an object or function")));
+        }
+
+        // Domain context
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        // Create baton
+        BlockPullBaton* baton = new BlockPullBaton();
+
+        // Add data
+        baton->callback  = Persistent<Function>::New(callback_);
+        baton->domain    = domain;
+        baton->disk      = disk;
+        baton->bandwidth = bandwidth;
+        baton->flags     = flags;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            BlockPullAsync,
+            (uv_after_work_cb)BlockPullAsyncAfter
+        );
+
+        return scope.Close(Undefined());
     }
 
     Handle<Value> Domain::BlockRebase(const Arguments& args) {
