@@ -36,7 +36,6 @@ namespace NodeLibvirt {
             static Handle<Value> GetName(const Arguments& args);
             static Handle<Value> GetUUID(const Arguments& args);
             static Handle<Value> LookupByName(const Arguments& args);
-            static Handle<Value> LookupByUUID(const Arguments& args);
             static Handle<Value> LookupByVolume(const Arguments& args);
             static Handle<Value> ToXml(const Arguments& args);
             static Handle<Value> IsActive(const Arguments& args);
