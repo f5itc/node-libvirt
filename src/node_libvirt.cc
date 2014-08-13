@@ -4,6 +4,7 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "node_libvirt.h"
 #include "hypervisor.h"
 #include "error.h"
@@ -43,6 +44,18 @@ namespace NodeLibvirt {
     // Extracts a C string from a V8 Utf8Value.
     const char* ToCString(const String::Utf8Value& value) {
         return *value ? *value : "<string conversion failed>";
+    }
+
+    const char *parseString(v8::Local<v8::Value> value, const char *fallback) {
+        if (value->IsString()) {
+            v8::String::AsciiValue string(value);
+            char *str = (char *) malloc(string.length() + 1);
+            strcpy(str, *string);
+            return str;
+        }
+        char *str = (char *) malloc(strlen(fallback) + 1);
+        strcpy(str, fallback);
+        return str;
     }
 
     extern "C" void init (Handle<Object> target) {

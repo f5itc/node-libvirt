@@ -28,6 +28,8 @@ using namespace node;
 namespace NodeLibvirt {
     const char* ToCString(const v8::String::Utf8Value& value);
     //Handle<Value> ToV8Array(int size, char **items);
+
+    const char *parseString(v8::Local<v8::Value> value, const char *fallback = "");
 }
 
 #endif  // SRC_NODE_LIBVIRT_H_
