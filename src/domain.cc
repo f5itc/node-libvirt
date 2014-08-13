@@ -105,6 +105,12 @@ namespace NodeLibvirt {
         unsigned int flags;
     };
 
+    struct GetBlockJobInfoBaton : BatonBase {
+        const char* disk;
+        unsigned int flags;
+        virDomainBlockJobInfo info;
+    };
+
     struct GetInfoBaton : BatonBase {
         virDomainInfo res;
     };
@@ -2970,15 +2976,72 @@ namespace NodeLibvirt {
         return scope.Close(Undefined());
     }
 
+    void GetBlockJobInfoAsync(uv_work_t* req) {
+        GetBlockJobInfoBaton* baton = static_cast<GetBlockJobInfoBaton*>(req->data);
+
+        Domain *domain = baton->domain;
+        unsigned int flags = baton->flags;
+        const char *disk = baton->disk;
+
+        virDomainBlockJobInfo info;
+        virErrorPtr err;
+
+        int ret = -1;
+
+        ret = virDomainGetBlockJobInfo(domain->domain_, disk, &info, flags);
+
+        if(ret == -1) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->info = info;
+        }
+    }
+
+    void GetBlockJobInfoAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        GetBlockJobInfoBaton* baton = static_cast<GetBlockJobInfoBaton*>(req->data);
+        virDomainBlockJobInfo info = baton->info;
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if(!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            Local<Object> obj = Object::New();
+
+            obj->Set(block_job_info_type_symbol,      Number::New(info.type));
+            obj->Set(block_job_info_bandwidth_symbol, Number::New(info.bandwidth));
+            obj->Set(block_job_info_cur_symbol,       Number::New(info.cur));
+            obj->Set(block_job_info_end_symbol,       Number::New(info.end));
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+          FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
     Handle<Value> Domain::GetBlockJobInfo(const Arguments& args) {
         HandleScope scope;
 
         Local<Object> options;
         Local<Function> callback;
 
-        virDomainBlockJobInfo info_;
         unsigned int flags = 0;
-        int ret = -1;
         const char* disk = "vda";
 
         // If only callback has been specified, use defaults
@@ -3044,27 +3107,31 @@ namespace NodeLibvirt {
             String::New("First argument must be an object or function")));
         }
 
+        // Domain context
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        ret = virDomainGetBlockJobInfo(
-            domain->domain_,
-            disk,
-            &info_,
-            flags
+        // Create baton
+        GetBlockJobInfoBaton* baton = new GetBlockJobInfoBaton();
+
+        // Add data to baton
+        baton->callback = Persistent<Function>::New(callback);
+        baton->domain   = domain;
+        baton->disk     = disk;
+        baton->flags    = flags;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dipatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            GetBlockJobInfoAsync,
+            (uv_after_work_cb)GetBlockJobInfoAsyncAfter
         );
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return scope.Close(Undefined());
-        }
-
-        Local<Object> info = Object::New();
-        info->Set(block_job_info_type_symbol,      Number::New(info_.type));
-        info->Set(block_job_info_bandwidth_symbol, Number::New(info_.bandwidth));
-        info->Set(block_job_info_cur_symbol,       Number::New(info_.cur));
-        info->Set(block_job_info_end_symbol,       Number::New(info_.end));
-
-        return scope.Close(info);
+        return scope.Close(Undefined());
     }
 
     Handle<Value> Domain::GetInterfaceStats(const Arguments& args) {
