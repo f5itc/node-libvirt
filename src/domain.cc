@@ -56,6 +56,12 @@ namespace NodeLibvirt {
     static Persistent<String> block_info_allocation_symbol;
     static Persistent<String> block_info_physical_symbol;
 
+    //block job info symbols
+    static Persistent<String> block_job_info_type_symbol;
+    static Persistent<String> block_job_info_bandwidth_symbol;
+    static Persistent<String> block_job_info_cur_symbol;
+    static Persistent<String> block_job_info_end_symbol;
+
     //domain network interface statistics symbols
     static Persistent<String> nwiface_stat_rx_bytes_symbol;
     static Persistent<String> nwiface_stat_rx_packets_symbol;
@@ -65,18 +71,6 @@ namespace NodeLibvirt {
     static Persistent<String> nwiface_stat_tx_packets_symbol;
     static Persistent<String> nwiface_stat_tx_errors_symbol;
     static Persistent<String> nwiface_stat_tx_drop_symbol;
-
-    const char *parseString(v8::Local<v8::Value> value, const char *fallback = "") {
-        if (value->IsString()) {
-            v8::String::AsciiValue string(value);
-            char *str = (char *) malloc(string.length() + 1);
-            strcpy(str, *string);
-            return str;
-        }
-        char *str = (char *) malloc(strlen(fallback) + 1);
-        strcpy(str, fallback);
-        return str;
-    }
 
     struct BatonBase {
         v8::Persistent<v8::Function> callback;
@@ -208,6 +202,10 @@ namespace NodeLibvirt {
                                       Domain::GetBlockStats);
         NODE_SET_PROTOTYPE_METHOD(t, "getBlockInfo",
                                       Domain::GetBlockInfo);
+        NODE_SET_PROTOTYPE_METHOD(t, "getBlockJobInfo",
+                                      Domain::GetBlockJobInfo);
+        NODE_SET_PROTOTYPE_METHOD(t, "abortBlockJob",
+                                      Domain::AbortBlockJob);
         NODE_SET_PROTOTYPE_METHOD(t, "getUUID",
                                       Domain::GetUUID);
         NODE_SET_PROTOTYPE_METHOD(t, "getVcpus",
@@ -452,6 +450,11 @@ namespace NodeLibvirt {
         block_info_capacity_symbol = NODE_PSYMBOL("capacity");
         block_info_allocation_symbol = NODE_PSYMBOL("allocation");
         block_info_physical_symbol = NODE_PSYMBOL("physical");
+
+        block_job_info_type_symbol = NODE_PSYMBOL("type");
+        block_job_info_bandwidth_symbol = NODE_PSYMBOL("bandwidth");
+        block_job_info_cur_symbol = NODE_PSYMBOL("cur");
+        block_job_info_end_symbol = NODE_PSYMBOL("end");
 
         nwiface_stat_rx_bytes_symbol = NODE_PSYMBOL("rx_bytes");
         nwiface_stat_rx_packets_symbol = NODE_PSYMBOL("rx_packets");
@@ -2748,6 +2751,191 @@ namespace NodeLibvirt {
         return scope.Close(info);
     }
 
+    Handle<Value> Domain::AbortBlockJob(const Arguments& args) {
+        HandleScope scope;
+
+        Local<Object> options;
+        Local<Function> callback;
+
+        unsigned int flags = 0;
+        int ret = -1;
+        const char* disk = "vda";
+
+        // If only callback has been specified, use defaults
+        if(args[0]->IsFunction()) {
+            callback = Local<Function>::Cast(args[0]);
+        }
+
+        // If options have been specified
+        else if(args[0]->IsObject()) {
+
+            // If callback has not been specified
+            if(!args[1]->IsFunction()) {
+                ThrowException(Exception::TypeError(
+                    String::New("Second argument must be a function"))
+                );
+                return scope.Close(Undefined());
+            }
+
+            options  = Local<Object>::Cast(args[0]);
+            callback = Local<Function>::Cast(args[1]);
+
+            // Supported options
+            Handle<Value> flags_ = options->Get(String::New("flags"));
+            Handle<Value> disk_ = options->Get(String::New("disk"));
+
+            // When disk option is specified
+            if (!flags_->IsNull()) {
+
+                // If disk option is not a string
+                if (!disk_->IsString()) {
+                    ThrowException(Exception::TypeError(
+                        String::New("Disk, if specified, must be a string"))
+                    );
+                    return scope.Close(Undefined());
+                }
+
+                disk = parseString(disk_->ToString());
+            }
+
+            // When flags option is specified
+            if (!flags_->IsUndefined()) {
+
+                // If flags option is not an array
+                if (!flags_->IsArray()) {
+                    ThrowException(Exception::TypeError(
+                        String::New("Flags, if specified, must be an array"))
+                    );
+                    return scope.Close(Undefined());
+                }
+
+                Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
+                unsigned int length = flagsArr_->Length();
+
+                for (unsigned int i = 0; i < length; i++) {
+                    flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
+                }
+            }
+        }
+
+        // If first argument is neither an object nor a function
+        else {
+            return ThrowException(Exception::TypeError(
+            String::New("First argument must be an object or function")));
+        }
+
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        ret = virDomainBlockJobAbort(
+            domain->domain_,
+            disk,
+            flags
+        );
+
+        if(ret == -1) {
+            ThrowException(Error::New(virGetLastError()));
+        }
+
+        return scope.Close(Undefined());
+    }
+
+    Handle<Value> Domain::GetBlockJobInfo(const Arguments& args) {
+        HandleScope scope;
+
+        Local<Object> options;
+        Local<Function> callback;
+
+        virDomainBlockJobInfo info_;
+        unsigned int flags = 0;
+        int ret = -1;
+        const char* disk = "vda";
+
+        // If only callback has been specified, use defaults
+        if(args[0]->IsFunction()) {
+            callback = Local<Function>::Cast(args[0]);
+        }
+
+        // If options have been specified
+        else if(args[0]->IsObject()) {
+
+            // If callback has not been specified
+            if(!args[1]->IsFunction()) {
+                ThrowException(Exception::TypeError(
+                    String::New("Second argument must be a function"))
+                );
+                return scope.Close(Undefined());
+            }
+
+            options  = Local<Object>::Cast(args[0]);
+            callback = Local<Function>::Cast(args[1]);
+
+            // Supported options
+            Handle<Value> flags_ = options->Get(String::New("flags"));
+            Handle<Value> disk_ = options->Get(String::New("disk"));
+
+            // When disk option is specified
+            if (!flags_->IsNull()) {
+
+                // If disk option is not a string
+                if (!disk_->IsString()) {
+                    ThrowException(Exception::TypeError(
+                        String::New("Disk, if specified, must be a string"))
+                    );
+                    return scope.Close(Undefined());
+                }
+
+                disk = parseString(disk_->ToString());
+            }
+
+            // When flags option is specified
+            if (!flags_->IsUndefined()) {
+
+                // If flags option is not an array
+                if (!flags_->IsArray()) {
+                    ThrowException(Exception::TypeError(
+                        String::New("Flags, if specified, must be an array"))
+                    );
+                    return scope.Close(Undefined());
+                }
+
+                Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
+                unsigned int length = flagsArr_->Length();
+
+                for (unsigned int i = 0; i < length; i++) {
+                    flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
+                }
+            }
+        }
+
+        // If first argument is neither an object nor a function
+        else {
+            return ThrowException(Exception::TypeError(
+            String::New("First argument must be an object or function")));
+        }
+
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        ret = virDomainGetBlockJobInfo(
+            domain->domain_,
+            disk,
+            &info_,
+            flags
+        );
+
+        if(ret == -1) {
+            ThrowException(Error::New(virGetLastError()));
+            return scope.Close(Undefined());
+        }
+
+        Local<Object> info = Object::New();
+        info->Set(block_job_info_type_symbol,      Number::New(info_.type));
+        info->Set(block_job_info_bandwidth_symbol, Number::New(info_.bandwidth));
+        info->Set(block_job_info_cur_symbol,       Number::New(info_.cur));
+        info->Set(block_job_info_end_symbol,       Number::New(info_.end));
+
+        return scope.Close(info);
+    }
+
     Handle<Value> Domain::GetInterfaceStats(const Arguments& args) {
         HandleScope scope;
         struct _virDomainInterfaceStats stats_;
@@ -3135,7 +3323,7 @@ namespace NodeLibvirt {
         virDomainSnapshotPtr snapshot = NULL;
         virErrorPtr err;
 
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, name, flags);
+        snapshot = virDomainSnapshotLookupByName(domain->domain_, name, 0);
 
         if(snapshot == NULL) {
             err = virGetLastError();

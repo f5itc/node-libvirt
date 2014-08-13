@@ -84,6 +84,8 @@ namespace NodeLibvirt {
             static Handle<Value> BlockRebase(const Arguments& args);
             static Handle<Value> GetBlockStats(const Arguments& args);
             static Handle<Value> GetBlockInfo(const Arguments& args);
+            static Handle<Value> GetBlockJobInfo(const Arguments& args);
+            static Handle<Value> AbortBlockJob(const Arguments& args);
             static Handle<Value> CoreDump(const Arguments& args);
             static Handle<Value> GetInterfaceStats(const Arguments& args);
             static Handle<Value> HasCurrentSnapshot(const Arguments& args);
