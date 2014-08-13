@@ -11,18 +11,6 @@ namespace NodeLibvirt {
     static Persistent<String> info_capacity_symbol;
     static Persistent<String> info_allocation_symbol;
 
-    const char *parseStr(v8::Local<v8::Value> value, const char *fallback = "") {
-        if (value->IsString()) {
-            v8::String::AsciiValue string(value);
-            char *str = (char *) malloc(string.length() + 1);
-            strcpy(str, *string);
-            return str;
-        }
-        char *str = (char *) malloc(strlen(fallback) + 1);
-        strcpy(str, fallback);
-        return str;
-    }
-
     struct BatonBase {
         v8::Persistent<v8::Function> callback;
         std::string error;
@@ -316,7 +304,7 @@ namespace NodeLibvirt {
             String::New("You must specify a StoragePool instance")));
         }
 
-        const char *name = parseStr(args[0]);
+        const char *name = parseString(args[0]);
 
         StoragePool *pool = ObjectWrap::Unwrap<StoragePool>(pool_obj);
 
@@ -447,7 +435,7 @@ namespace NodeLibvirt {
             String::New("You must specify a Hypervisor instance")));
         }
 
-        const char *path = parseStr(args[0]);
+        const char *path = parseString(args[0]);
 
         Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
