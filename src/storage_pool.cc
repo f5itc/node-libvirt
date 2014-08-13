@@ -56,6 +56,8 @@ namespace NodeLibvirt {
                                       StorageVolume::Clone);
         NODE_SET_PROTOTYPE_METHOD(t, "lookupVolumeByName",
                                       StorageVolume::LookupByName);
+        NODE_SET_PROTOTYPE_METHOD(t, "lookupByUUID",
+                                      StorageVolume::LookupByUUID);
 
         constructor_template = Persistent<FunctionTemplate>::New(t);
         constructor_template->SetClassName(String::NewSymbol("StoragePool"));
