@@ -30,16 +30,19 @@ namespace NodeLibvirt {
             static Handle<Value> GetPath(const Arguments& args);
             static Handle<Value> ToXml(const Arguments& args);
             static Handle<Value> LookupByKey(const Arguments& args);
+
             static Handle<Value> LookupByName(const Arguments& args);
+            friend void LookupByNameAsync(uv_work_t* req);
+            friend void LookupByNameAsyncAfter(uv_work_t* req);
+
             static Handle<Value> LookupByPath(const Arguments& args);
+            friend void LookupByPathAsync(uv_work_t* req);
+            friend void LookupByPathAsyncAfter(uv_work_t* req);
+
+            static Handle<Value> LookupByUUID(const Arguments& args);
             static Handle<Value> Wipe(const Arguments& args);
             static Handle<Value> Delete(const Arguments& args);
             static Handle<Value> Clone(const Arguments& args);
-
-            friend void LookupByPathAsync(uv_work_t* req);
-            friend void LookupByPathAsyncAfter(uv_work_t* req);
-            friend void LookupByNameAsync(uv_work_t* req);
-            friend void LookupByNameAsyncAfter(uv_work_t* req);
 
         private:
             virStorageVolPtr volume_;
