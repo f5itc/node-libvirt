@@ -111,6 +111,10 @@ namespace NodeLibvirt {
       virNodeInfo res;
     };
 
+    struct GetDomainCountBaton: HypervisorBaton { 
+      int res;
+    };
+
     void Hypervisor::Initialize(Handle<Object> target) {
         HandleScope scope;
 
@@ -175,6 +179,9 @@ namespace NodeLibvirt {
 
         NODE_SET_PROTOTYPE_METHOD(t, "getDefinedStoragePools",
                                       Hypervisor::GetDefinedStoragePools);
+
+        NODE_SET_PROTOTYPE_METHOD(t, "getDomainCount",
+                                      Hypervisor::GetDomainCount);
 
         NODE_SET_PROTOTYPE_METHOD(t, "getActiveDomains",
                                       Hypervisor::GetActiveDomains);
@@ -887,6 +894,85 @@ namespace NodeLibvirt {
         Local<Number> result = Number::New(ret);
 
         return scope.Close(result);
+    }
+
+    void GetDomainCountAsync(uv_work_t* req) {
+      GetDomainCountBaton* baton = static_cast<GetDomainCountBaton*>(req->data);
+
+      Hypervisor *hypervisor = baton->hypervisor;
+
+      int numDomains= -1;
+      virErrorPtr err;
+
+      numDomains = virConnectNumOfDomains(hypervisor->conn_);
+
+      if (numDomains == -1) {
+        err = virGetLastError();
+        baton->error = err->message;
+      }
+
+      else {
+        baton->res = numDomains;
+      }
+    }
+
+    void GetDomainCountAsyncAfter(uv_work_t* req) {
+      HandleScope scope;
+
+      GetDomainCountBaton* baton = static_cast<GetDomainCountBaton*>(req->data);
+      delete req;
+
+      Handle<Value> argv[2];
+
+      if (!baton->error.empty()) {
+        argv[0] = Exception::Error(String::New(baton->error.c_str()));
+        argv[1] = Undefined();
+      }
+
+      else {
+        int numDomains = baton->res;
+        argv[0] = Undefined();
+        argv[1] = scope.Close(Number::New(numDomains));
+      }
+
+      TryCatch try_catch;
+
+      if (try_catch.HasCaught())
+        FatalException(try_catch);
+
+      baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+      delete baton;
+    }
+
+    Handle<Value> Hypervisor::GetDomainCount(const Arguments& args) {
+      HandleScope scope;
+
+      // Hypervisor context
+      Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
+
+      // Callback
+      Local<Function> callback = Local<Function>::Cast(args[0]);
+
+      // Create baton
+      GetDomainCountBaton* baton = new GetDomainCountBaton();
+
+      // Add callback and hypervisor
+      baton->callback = Persistent<Function>::New(callback);
+      baton->hypervisor = hypervisor;
+
+      // Compose req
+      uv_work_t* req = new uv_work_t;
+      req->data = baton;
+
+      // Dispatch work
+      uv_queue_work(
+        uv_default_loop(),
+        req,
+        GetDomainCountAsync,
+        (uv_after_work_cb)GetDomainCountAsyncAfter
+      );
+
+      return Undefined();
     }
 
     Handle<Value> Hypervisor::GetActiveDomains(const Arguments& args) {
