@@ -87,6 +87,12 @@ namespace NodeLibvirt {
             //Misc functions
             static Handle<Value> FindStoragePoolSources(const Arguments& args);
 
+            //Async functions
+            friend void GetNodeFreeMemoryAsync(uv_work_t* req);
+            friend void GetNodeFreeMemoryAsyncAfter(uv_work_t* req);
+            friend void GetNodeInfoAsync(uv_work_t* req);
+            friend void GetNodeInfoAsyncAfter(uv_work_t* req);
+
             Hypervisor( char* uri,
                         char* user,
                         char* pass,
