@@ -114,6 +114,7 @@ namespace NodeLibvirt {
     void Hypervisor::Initialize(Handle<Object> target) {
         HandleScope scope;
 
+//        t->Inherit(EventEmitter::constructor_template);
         Local<FunctionTemplate> t = FunctionTemplate::New(New);
 
         t->InstanceTemplate()->SetInternalFieldCount(1);
