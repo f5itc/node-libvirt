@@ -124,6 +124,11 @@ namespace NodeLibvirt {
         int res;
     };
 
+    struct LookupDomainByIdBaton : BatonBase {
+        int id;
+        Hypervisor* hypervisor;
+        Domain* domain;
+    };
     struct LookupDomainByNameBaton : BatonBase {
         const char* name;
         Hypervisor* hypervisor;
@@ -537,6 +542,7 @@ namespace NodeLibvirt {
     }
 
     Handle<Value> Domain::Create(const Arguments& args) {
+
         HandleScope scope;
         unsigned int flags = 0;
 
@@ -650,6 +656,56 @@ namespace NodeLibvirt {
 
         return True();
     }
+    void LookupDomainByIdAsync(uv_work_t* req) {
+        LookupDomainByIdBaton* baton = static_cast<LookupDomainByIdBaton*>(req->data);
+
+        int id = baton->id;
+        Hypervisor *hypervisor = baton->hypervisor;
+        virErrorPtr err;
+
+        Domain *domain = new Domain();
+        domain->domain_ = virDomainLookupByID(hypervisor->connection(), id);
+
+       if (domain->domain_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+       }
+
+       else {
+            baton->domain = domain;
+       }
+
+    }
+
+    void LookupDomainByIdAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        LookupDomainByIdBaton* baton = static_cast<LookupDomainByIdBaton*>(req->data);
+        delete req;
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            Domain *domain = baton->domain;
+            Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+            domain->Wrap(domain_obj);
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(domain_obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
 
     Handle<Value> Domain::LookupById(const Arguments& args) {
         HandleScope scope;
@@ -669,21 +725,34 @@ namespace NodeLibvirt {
         }
 
         id = args[0]->Int32Value();
-
+        // Unwrap hypervisor
         Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        Domain *domain = new Domain();
-        domain->domain_ = virDomainLookupByID(hypervisor->connection(), id);
-        if(domain->domain_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[1]);
 
-        Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+        // Create baton
+        LookupDomainByIdBaton* baton = new LookupDomainByIdBaton();
 
-        domain->Wrap(domain_obj);
+        // Add callback, name, and hypervisor
+        baton->callback = Persistent<Function>::New(callback);
+        baton->id = id;
+        baton->hypervisor = hypervisor;
 
-        return scope.Close(domain_obj);
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            LookupDomainByIdAsync,
+            (uv_after_work_cb)LookupDomainByIdAsyncAfter
+        );
+        delete req;
+
+        return scope.Close(Undefined());
     }
 
     void LookupDomainByNameAsync(uv_work_t* req) {
@@ -1276,7 +1345,7 @@ namespace NodeLibvirt {
             FatalException(try_catch);
 
         baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton; 
+        delete baton;
     }
 
     Handle<Value> Domain::Suspend(const Arguments& args) {
@@ -1349,7 +1418,7 @@ namespace NodeLibvirt {
             FatalException(try_catch);
 
         baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton; 
+        delete baton;
     }
 
     Handle<Value> Domain::Resume(const Arguments& args) {
@@ -1434,7 +1503,7 @@ namespace NodeLibvirt {
         for(unsigned int i = 0; i < length; i++) {
             keycodes[i] = (unsigned int) keycodes_->Get(Integer::New(i))->Int32Value();
         }
-        
+
         ret = virDomainSendKey(domain->domain_, 0, 150, keycodes, length, 0);
 
         if(ret == -1) {
@@ -3343,7 +3412,7 @@ namespace NodeLibvirt {
             err = virGetLastError();
             baton->error = err->message;
         }
-        
+
         else {
             virDomainSnapshotFree(snapshot);
         }
@@ -3360,7 +3429,7 @@ namespace NodeLibvirt {
         if (!baton->error.empty()) {
             argv[0] = Exception::Error(String::New(baton->error.c_str()));
             argv[1] = Undefined();
-        } 
+        }
 
         else {
             argv[0] = Undefined();
@@ -3382,7 +3451,7 @@ namespace NodeLibvirt {
         // Domain context
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        // XML 
+        // XML
         const char *xml = parseString(args[0]);
 
         // Flags
@@ -3418,7 +3487,7 @@ namespace NodeLibvirt {
         baton->callback = Persistent<Function>::New(callback);
 
         // Add data to baton
-        baton->domain = domain; 
+        baton->domain = domain;
         baton->flags = flags;
         baton->xml = xml;
 
@@ -3610,7 +3679,7 @@ namespace NodeLibvirt {
         baton->domain = domain;
         baton->name = name;
         baton->flags = flags;
-        
+
         // Compose req
         uv_work_t* req = new uv_work_t;
         req->data = baton;

@@ -1,3 +1,5 @@
+var assert = require('assert');
+
 var SegfaultHandler = require('segfault-handler');
 SegfaultHandler.registerHandler();
 
@@ -10,20 +12,21 @@ var Hypervisor = libvirt.Hypervisor;
 var hypervisor = new Hypervisor('test:///default');
 var domain;
 
-module.exports = {
-    'should lookup a domain by id': function(beforeExit, assert) {
+describe('domain', function() {
+    it('should lookup a domain by id', function() {
         domain = hypervisor.lookupDomainById(1);
-        assert.isNotNull(domain);
-    },
+        assert.notStrictEqual(null, domain);
+    };
 
-    'should create a persistent Domain from its JSON Description': function(beforeExit, assert) {
+    it('should create a persistent Domain from its JSON Description':
+      function() {
         try {
-        var xml = fixture('domain.xml');
-        hypervisor.createDomain(xml);
+          var xml = fixture('domain.xml');
+          hypervisor.createDomain(xml);
 
-        var dom = hypervisor.lookupDomainByName('nodejs-test');
-        assert.eql(dom.getName(), 'nodejs-test');
-        assert.eql(dom.destroy(), true);
+          var dom = hypervisor.lookupDomainByName('nodejs-test');
+          assert.equal(dom.getName(), 'nodejs-test');
+          assert.equal(dom.destroy(), true);
         } catch(err) {}
     },
 
