@@ -5,3771 +5,3767 @@
 #include "domain.h"
 
 namespace NodeLibvirt {
-    Persistent<FunctionTemplate> Domain::constructor_template;
+	Persistent<FunctionTemplate> Domain::constructor_template;
 
-    static Persistent<String> state_symbol;
-    static Persistent<String> max_memory_symbol;
-    static Persistent<String> memory_symbol;
-    static Persistent<String> vcpus_number_symbol;
-    static Persistent<String> cpu_time_symbol;
-    static Persistent<String> number_symbol;
-    static Persistent<String> cpu_symbol;
-    static Persistent<String> affinity_symbol;
-    static Persistent<String> usable_symbol;
-    static Persistent<String> migration_uri_symbol;
-    static Persistent<String> migration_name_symbol;
-    static Persistent<String> migration_bandwidth_symbol;
-    static Persistent<String> migration_flags_symbol;
-    static Persistent<String> migration_hypervisor_symbol;
+	static Persistent<String> state_symbol;
+	static Persistent<String> max_memory_symbol;
+	static Persistent<String> memory_symbol;
+	static Persistent<String> vcpus_number_symbol;
+	static Persistent<String> cpu_time_symbol;
+	static Persistent<String> number_symbol;
+	static Persistent<String> cpu_symbol;
+	static Persistent<String> affinity_symbol;
+	static Persistent<String> usable_symbol;
+	static Persistent<String> migration_uri_symbol;
+	static Persistent<String> migration_name_symbol;
+	static Persistent<String> migration_bandwidth_symbol;
+	static Persistent<String> migration_flags_symbol;
+	static Persistent<String> migration_hypervisor_symbol;
 
-    //Jobinfo symbols
-    static Persistent<String> type_symbol;
-    static Persistent<String> time_symbol;
-    static Persistent<String> data_symbol;
-    static Persistent<String> file_symbol;
-    static Persistent<String> elapsed_symbol;
-    static Persistent<String> remaining_symbol;
-    static Persistent<String> total_symbol;
-    static Persistent<String> processed_symbol;
+	//Jobinfo symbols
+	static Persistent<String> type_symbol;
+	static Persistent<String> time_symbol;
+	static Persistent<String> data_symbol;
+	static Persistent<String> file_symbol;
+	static Persistent<String> elapsed_symbol;
+	static Persistent<String> remaining_symbol;
+	static Persistent<String> total_symbol;
+	static Persistent<String> processed_symbol;
 
-    //SecurityLabel symbols
-    static Persistent<String> label_symbol;
-    static Persistent<String> enforcing_symbol;
+	//SecurityLabel symbols
+	static Persistent<String> label_symbol;
+	static Persistent<String> enforcing_symbol;
 
-    //memory stat symbols
-    static Persistent<String> memory_stat_swap_in_symbol;
-    static Persistent<String> memory_stat_swap_out_symbol;
-    static Persistent<String> memory_stat_major_fault_symbol;
-    static Persistent<String> memory_stat_minor_fault_symbol;
-    static Persistent<String> memory_stat_unused_symbol;
-    static Persistent<String> memory_stat_available_symbol;
+	//memory stat symbols
+	static Persistent<String> memory_stat_swap_in_symbol;
+	static Persistent<String> memory_stat_swap_out_symbol;
+	static Persistent<String> memory_stat_major_fault_symbol;
+	static Persistent<String> memory_stat_minor_fault_symbol;
+	static Persistent<String> memory_stat_unused_symbol;
+	static Persistent<String> memory_stat_available_symbol;
 
-    //block stat symbols
-    static Persistent<String> block_stat_rd_req_symbol;
-    static Persistent<String> block_stat_rd_bytes_symbol;
-    static Persistent<String> block_stat_wr_req_symbol;
-    static Persistent<String> block_stat_wr_bytes_symbol;
-    static Persistent<String> block_stat_errs_symbol;
+	//block stat symbols
+	static Persistent<String> block_stat_rd_req_symbol;
+	static Persistent<String> block_stat_rd_bytes_symbol;
+	static Persistent<String> block_stat_wr_req_symbol;
+	static Persistent<String> block_stat_wr_bytes_symbol;
+	static Persistent<String> block_stat_errs_symbol;
 
-    //block info symbols
-    static Persistent<String> block_info_capacity_symbol;
-    static Persistent<String> block_info_allocation_symbol;
-    static Persistent<String> block_info_physical_symbol;
+	//block info symbols
+	static Persistent<String> block_info_capacity_symbol;
+	static Persistent<String> block_info_allocation_symbol;
+	static Persistent<String> block_info_physical_symbol;
 
-    //block job info symbols
-    static Persistent<String> block_job_info_type_symbol;
-    static Persistent<String> block_job_info_bandwidth_symbol;
-    static Persistent<String> block_job_info_cur_symbol;
-    static Persistent<String> block_job_info_end_symbol;
+	//block job info symbols
+	static Persistent<String> block_job_info_type_symbol;
+	static Persistent<String> block_job_info_bandwidth_symbol;
+	static Persistent<String> block_job_info_cur_symbol;
+	static Persistent<String> block_job_info_end_symbol;
 
-    //domain network interface statistics symbols
-    static Persistent<String> nwiface_stat_rx_bytes_symbol;
-    static Persistent<String> nwiface_stat_rx_packets_symbol;
-    static Persistent<String> nwiface_stat_rx_errors_symbol;
-    static Persistent<String> nwiface_stat_rx_drop_symbol;
-    static Persistent<String> nwiface_stat_tx_bytes_symbol;
-    static Persistent<String> nwiface_stat_tx_packets_symbol;
-    static Persistent<String> nwiface_stat_tx_errors_symbol;
-    static Persistent<String> nwiface_stat_tx_drop_symbol;
+	//domain network interface statistics symbols
+	static Persistent<String> nwiface_stat_rx_bytes_symbol;
+	static Persistent<String> nwiface_stat_rx_packets_symbol;
+	static Persistent<String> nwiface_stat_rx_errors_symbol;
+	static Persistent<String> nwiface_stat_rx_drop_symbol;
+	static Persistent<String> nwiface_stat_tx_bytes_symbol;
+	static Persistent<String> nwiface_stat_tx_packets_symbol;
+	static Persistent<String> nwiface_stat_tx_errors_symbol;
+	static Persistent<String> nwiface_stat_tx_drop_symbol;
 
-    struct BatonBase {
-        v8::Persistent<v8::Function> callback;
-        std::string error;
-        Domain* domain;
+	struct BatonBase {
+		v8::Persistent<v8::Function> callback;
+		std::string error;
+		Domain* domain;
 
-        virtual ~BatonBase() {
-            callback.Dispose();
-        }
-    };
+		virtual ~BatonBase() {
+			callback.Dispose();
+		}
+	};
 
-    struct AttachDeviceBaton : BatonBase {
-        const char* xml;
-        unsigned int flags;
-    };
+	struct AttachDeviceBaton : BatonBase {
+		const char* xml;
+		unsigned int flags;
+	};
 
-    struct BlockPullBaton : BatonBase {
-        const char* disk;
-        unsigned int bandwidth;
-        unsigned int flags;
-    };
+	struct BlockPullBaton : BatonBase {
+		const char* disk;
+		unsigned int bandwidth;
+		unsigned int flags;
+	};
 
-    struct CreateDomainBaton : BatonBase {
-        const char* xml;
-        unsigned int flags;
-        Hypervisor* hypervisor;
-        Domain* domain;
-    };
+	struct CreateDomainBaton : BatonBase {
+		const char* xml;
+		unsigned int flags;
+		Hypervisor* hypervisor;
+		Domain* domain;
+	};
 
-    struct DetachDeviceBaton : BatonBase {
-        const char* xml;
-        unsigned int flags;
-    };
+	struct DetachDeviceBaton : BatonBase {
+		const char* xml;
+		unsigned int flags;
+	};
 
-    struct GetBlockJobInfoBaton : BatonBase {
-        const char* disk;
-        unsigned int flags;
-        virDomainBlockJobInfo info;
-    };
+	struct GetBlockJobInfoBaton : BatonBase {
+		const char* disk;
+		unsigned int flags;
+		virDomainBlockJobInfo info;
+	};
 
-    struct GetInfoBaton : BatonBase {
-        virDomainInfo res;
-    };
+	struct GetInfoBaton : BatonBase {
+		virDomainInfo res;
+	};
 
-    struct DeleteSnapshotBaton : BatonBase {
-        const char* name;
-        unsigned int flags;
-    };
+	struct DeleteSnapshotBaton : BatonBase {
+		const char* name;
+		unsigned int flags;
+	};
 
-    struct DestroyBaton : BatonBase {
-        int res;
-    };
+	struct DestroyBaton : BatonBase {
+		int res;
+	};
 
-    struct LookupDomainByIdBaton : BatonBase {
-        int id;
-        Hypervisor* hypervisor;
-        Domain* domain;
-    };
-    struct LookupDomainByNameBaton : BatonBase {
-        const char* name;
-        Hypervisor* hypervisor;
-        Domain* domain;
-    };
+	struct LookupDomainByIdBaton : BatonBase {
+		int id;
+		Hypervisor* hypervisor;
+		Domain* domain;
+	};
+	struct LookupDomainByNameBaton : BatonBase {
+		const char* name;
+		Hypervisor* hypervisor;
+		Domain* domain;
+	};
 
-    struct ResumeBaton : BatonBase {
-        int res;
-    };
+	struct ResumeBaton : BatonBase {
+		int res;
+	};
 
-    struct RevertToSnapshotBaton : BatonBase {
-        const char* name;
-        unsigned int lookupflags;
-        unsigned int revertflags;
-    };
+	struct RevertToSnapshotBaton : BatonBase {
+		const char* name;
+		unsigned int lookupflags;
+		unsigned int revertflags;
+	};
 
-    struct SuspendBaton : BatonBase {
-        int res;
-    };
+	struct SuspendBaton : BatonBase {
+		int res;
+	};
 
-    struct TakeSnapshotBaton : BatonBase {
-        const char* xml;
-        unsigned int flags;
-    };
+	struct TakeSnapshotBaton : BatonBase {
+		const char* xml;
+		unsigned int flags;
+	};
 
-    struct ToXmlBaton : BatonBase {
-        unsigned int flags;
-        char* xml;
-    };
+	struct ToXmlBaton : BatonBase {
+		unsigned int flags;
+		char* xml;
+	};
 
-    void Domain::Initialize() {
-        Local<FunctionTemplate> t = FunctionTemplate::New();
+	void Domain::Initialize() {
+		Local<FunctionTemplate> t = FunctionTemplate::New();
 
-//        t->Inherit(EventEmitter::constructor_template);
-        t->InstanceTemplate()->SetInternalFieldCount(1);
+		//        t->Inherit(EventEmitter::constructor_template);
+		t->InstanceTemplate()->SetInternalFieldCount(1);
 
-        NODE_SET_PROTOTYPE_METHOD(t, "getId",
-                                      Domain::GetId);
-        NODE_SET_PROTOTYPE_METHOD(t, "toXml",
-                                      Domain::ToXml);
-        NODE_SET_PROTOTYPE_METHOD(t, "getJobInfo",
-                                      Domain::GetJobInfo);
-        NODE_SET_PROTOTYPE_METHOD(t, "abortCurrentJob",
-                                      Domain::AbortCurrentJob);
-        NODE_SET_PROTOTYPE_METHOD(t, "getMaxMemory",
-                                      Domain::GetMaxMemory);
-        NODE_SET_PROTOTYPE_METHOD(t, "setMaxMemory",
-                                      Domain::SetMaxMemory);
-        NODE_SET_PROTOTYPE_METHOD(t, "setMemory",
-                                      Domain::SetMemory);
-        NODE_SET_PROTOTYPE_METHOD(t, "getMaxVcpus",
-                                      Domain::GetMaxVcpus);
-        NODE_SET_PROTOTYPE_METHOD(t, "getAutostart",
-                                      Domain::GetAutostart);
-        NODE_SET_PROTOTYPE_METHOD(t, "setAutostart",
-                                      Domain::SetAutostart);
-        NODE_SET_PROTOTYPE_METHOD(t, "getName",
-                                      Domain::GetName);
-        NODE_SET_PROTOTYPE_METHOD(t, "getOsType",
-                                      Domain::GetOsType);
-        NODE_SET_PROTOTYPE_METHOD(t, "getInfo",
-                                      Domain::GetInfo);
-        NODE_SET_PROTOTYPE_METHOD(t, "getSchedParams",
-                                      Domain::GetSchedParams);
-        NODE_SET_PROTOTYPE_METHOD(t, "setSchedParams",
-                                      Domain::SetSchedParams);
-        /*NODE_SET_PROTOTYPE_METHOD(t, "getSchedType",
-                                      Domain::GetSchedType); */ //It's necessary this function?
-        NODE_SET_PROTOTYPE_METHOD(t, "getSecurityLabel",
-                                      Domain::GetSecurityLabel);
-        NODE_SET_PROTOTYPE_METHOD(t, "hasManagedImage",
-                                      Domain::HasManagedImage);
-        NODE_SET_PROTOTYPE_METHOD(t, "saveManagedImage",
-                                      Domain::SaveManagedImage);
-        NODE_SET_PROTOTYPE_METHOD(t, "removeManagedImage",
-                                      Domain::RemoveManagedImage);
-        NODE_SET_PROTOTYPE_METHOD(t, "memoryPeek",
-                                      Domain::MemoryPeek);
-        NODE_SET_PROTOTYPE_METHOD(t, "getMemoryStats",
-                                      Domain::GetMemoryStats);
-        NODE_SET_PROTOTYPE_METHOD(t, "blockPeek",
-                                      Domain::BlockPeek);
-        NODE_SET_PROTOTYPE_METHOD(t, "blockPull",
-                                      Domain::BlockPull);
-        NODE_SET_PROTOTYPE_METHOD(t, "blockRebase",
-                                      Domain::BlockRebase);
-        NODE_SET_PROTOTYPE_METHOD(t, "getBlockStats",
-                                      Domain::GetBlockStats);
-        NODE_SET_PROTOTYPE_METHOD(t, "getBlockInfo",
-                                      Domain::GetBlockInfo);
-        NODE_SET_PROTOTYPE_METHOD(t, "getBlockJobInfo",
-                                      Domain::GetBlockJobInfo);
-        NODE_SET_PROTOTYPE_METHOD(t, "abortBlockJob",
-                                      Domain::AbortBlockJob);
-        NODE_SET_PROTOTYPE_METHOD(t, "getUUID",
-                                      Domain::GetUUID);
-        NODE_SET_PROTOTYPE_METHOD(t, "getVcpus",
-                                      Domain::GetVcpus);
-        NODE_SET_PROTOTYPE_METHOD(t, "setVcpus",
-                                      Domain::SetVcpus);
-        NODE_SET_PROTOTYPE_METHOD(t, "isActive",
-                                      Domain::IsActive);
-        NODE_SET_PROTOTYPE_METHOD(t, "isPersistent",
-                                      Domain::IsPersistent);
-        NODE_SET_PROTOTYPE_METHOD(t, "isUpdated",
-                                      Domain::IsUpdated);
-        NODE_SET_PROTOTYPE_METHOD(t, "getInterfaceStats",
-                                      Domain::GetInterfaceStats);
-        NODE_SET_PROTOTYPE_METHOD(t, "coreDump",
-                                      Domain::CoreDump);
-        NODE_SET_PROTOTYPE_METHOD(t, "migrate",
-                                      Domain::Migrate);
-        NODE_SET_PROTOTYPE_METHOD(t, "setMigrationMaxDowntime",
-                                      Domain::SetMigrationMaxDowntime);
-        NODE_SET_PROTOTYPE_METHOD(t, "pinVcpu",
-                                      Domain::PinVcpu);
-        NODE_SET_PROTOTYPE_METHOD(t, "reboot",
-                                      Domain::Reboot);
-        NODE_SET_PROTOTYPE_METHOD(t, "reset",
-                                      Domain::Reset);
-        NODE_SET_PROTOTYPE_METHOD(t, "resume",
-                                      Domain::Resume);
-        NODE_SET_PROTOTYPE_METHOD(t, "save",
-                                      Domain::Save);
-        NODE_SET_PROTOTYPE_METHOD(t, "shutdown",
-                                      Domain::Shutdown);
-        NODE_SET_PROTOTYPE_METHOD(t, "start",
-                                      Domain::Start);
-        NODE_SET_PROTOTYPE_METHOD(t, "suspend",
-                                      Domain::Suspend);
-        NODE_SET_PROTOTYPE_METHOD(t, "sendKey",
-                                      Domain::SendKey);
-        NODE_SET_PROTOTYPE_METHOD(t, "attachDevice",
-                                      Domain::AttachDevice);
-        NODE_SET_PROTOTYPE_METHOD(t, "detachDevice",
-                                      Domain::DetachDevice);
-        NODE_SET_PROTOTYPE_METHOD(t, "updateDevice",
-                                      Domain::UpdateDevice);
-        NODE_SET_PROTOTYPE_METHOD(t, "destroy",
-                                      Domain::Destroy);
-        NODE_SET_PROTOTYPE_METHOD(t, "undefine",
-                                      Domain::Undefine);
-        NODE_SET_PROTOTYPE_METHOD(t, "hasCurrentSnapshot",
-                                      Domain::HasCurrentSnapshot);
-        NODE_SET_PROTOTYPE_METHOD(t, "revertToSnapshot",
-                                      Domain::RevertToSnapshot);
-        NODE_SET_PROTOTYPE_METHOD(t, "takeSnapshot",
-                                      Domain::TakeSnapshot);
-        NODE_SET_PROTOTYPE_METHOD(t, "getCurrentSnapshot",
-                                      Domain::GetCurrentSnapshot);
-        NODE_SET_PROTOTYPE_METHOD(t, "deleteSnapshot",
-                                      Domain::DeleteSnapshot);
-        NODE_SET_PROTOTYPE_METHOD(t, "lookupSnapshotByName",
-                                      Domain::LookupSnapshotByName);
-        NODE_SET_PROTOTYPE_METHOD(t, "getSnapshots",
-                                      Domain::GetSnapshots);
+		NODE_SET_PROTOTYPE_METHOD(t, "getId",
+				Domain::GetId);
+		NODE_SET_PROTOTYPE_METHOD(t, "toXml",
+				Domain::ToXml);
+		NODE_SET_PROTOTYPE_METHOD(t, "getJobInfo",
+				Domain::GetJobInfo);
+		NODE_SET_PROTOTYPE_METHOD(t, "abortCurrentJob",
+				Domain::AbortCurrentJob);
+		NODE_SET_PROTOTYPE_METHOD(t, "getMaxMemory",
+				Domain::GetMaxMemory);
+		NODE_SET_PROTOTYPE_METHOD(t, "setMaxMemory",
+				Domain::SetMaxMemory);
+		NODE_SET_PROTOTYPE_METHOD(t, "setMemory",
+				Domain::SetMemory);
+		NODE_SET_PROTOTYPE_METHOD(t, "getMaxVcpus",
+				Domain::GetMaxVcpus);
+		NODE_SET_PROTOTYPE_METHOD(t, "getAutostart",
+				Domain::GetAutostart);
+		NODE_SET_PROTOTYPE_METHOD(t, "setAutostart",
+				Domain::SetAutostart);
+		NODE_SET_PROTOTYPE_METHOD(t, "getName",
+				Domain::GetName);
+		NODE_SET_PROTOTYPE_METHOD(t, "getOsType",
+				Domain::GetOsType);
+		NODE_SET_PROTOTYPE_METHOD(t, "getInfo",
+				Domain::GetInfo);
+		NODE_SET_PROTOTYPE_METHOD(t, "getSchedParams",
+				Domain::GetSchedParams);
+		NODE_SET_PROTOTYPE_METHOD(t, "setSchedParams",
+				Domain::SetSchedParams);
+		/*NODE_SET_PROTOTYPE_METHOD(t, "getSchedType",
+			Domain::GetSchedType); */ //It's necessary this function?
+		NODE_SET_PROTOTYPE_METHOD(t, "getSecurityLabel",
+				Domain::GetSecurityLabel);
+		NODE_SET_PROTOTYPE_METHOD(t, "hasManagedImage",
+				Domain::HasManagedImage);
+		NODE_SET_PROTOTYPE_METHOD(t, "saveManagedImage",
+				Domain::SaveManagedImage);
+		NODE_SET_PROTOTYPE_METHOD(t, "removeManagedImage",
+				Domain::RemoveManagedImage);
+		NODE_SET_PROTOTYPE_METHOD(t, "memoryPeek",
+				Domain::MemoryPeek);
+		NODE_SET_PROTOTYPE_METHOD(t, "getMemoryStats",
+				Domain::GetMemoryStats);
+		NODE_SET_PROTOTYPE_METHOD(t, "blockPeek",
+				Domain::BlockPeek);
+		NODE_SET_PROTOTYPE_METHOD(t, "blockPull",
+				Domain::BlockPull);
+		NODE_SET_PROTOTYPE_METHOD(t, "blockRebase",
+				Domain::BlockRebase);
+		NODE_SET_PROTOTYPE_METHOD(t, "getBlockStats",
+				Domain::GetBlockStats);
+		NODE_SET_PROTOTYPE_METHOD(t, "getBlockInfo",
+				Domain::GetBlockInfo);
+		NODE_SET_PROTOTYPE_METHOD(t, "getBlockJobInfo",
+				Domain::GetBlockJobInfo);
+		NODE_SET_PROTOTYPE_METHOD(t, "abortBlockJob",
+				Domain::AbortBlockJob);
+		NODE_SET_PROTOTYPE_METHOD(t, "getUUID",
+				Domain::GetUUID);
+		NODE_SET_PROTOTYPE_METHOD(t, "getVcpus",
+				Domain::GetVcpus);
+		NODE_SET_PROTOTYPE_METHOD(t, "setVcpus",
+				Domain::SetVcpus);
+		NODE_SET_PROTOTYPE_METHOD(t, "isActive",
+				Domain::IsActive);
+		NODE_SET_PROTOTYPE_METHOD(t, "isPersistent",
+				Domain::IsPersistent);
+		NODE_SET_PROTOTYPE_METHOD(t, "isUpdated",
+				Domain::IsUpdated);
+		NODE_SET_PROTOTYPE_METHOD(t, "getInterfaceStats",
+				Domain::GetInterfaceStats);
+		NODE_SET_PROTOTYPE_METHOD(t, "coreDump",
+				Domain::CoreDump);
+		NODE_SET_PROTOTYPE_METHOD(t, "migrate",
+				Domain::Migrate);
+		NODE_SET_PROTOTYPE_METHOD(t, "setMigrationMaxDowntime",
+				Domain::SetMigrationMaxDowntime);
+		NODE_SET_PROTOTYPE_METHOD(t, "pinVcpu",
+				Domain::PinVcpu);
+		NODE_SET_PROTOTYPE_METHOD(t, "reboot",
+				Domain::Reboot);
+		NODE_SET_PROTOTYPE_METHOD(t, "reset",
+				Domain::Reset);
+		NODE_SET_PROTOTYPE_METHOD(t, "resume",
+				Domain::Resume);
+		NODE_SET_PROTOTYPE_METHOD(t, "save",
+				Domain::Save);
+		NODE_SET_PROTOTYPE_METHOD(t, "shutdown",
+				Domain::Shutdown);
+		NODE_SET_PROTOTYPE_METHOD(t, "start",
+				Domain::Start);
+		NODE_SET_PROTOTYPE_METHOD(t, "suspend",
+				Domain::Suspend);
+		NODE_SET_PROTOTYPE_METHOD(t, "sendKey",
+				Domain::SendKey);
+		NODE_SET_PROTOTYPE_METHOD(t, "attachDevice",
+				Domain::AttachDevice);
+		NODE_SET_PROTOTYPE_METHOD(t, "detachDevice",
+				Domain::DetachDevice);
+		NODE_SET_PROTOTYPE_METHOD(t, "updateDevice",
+				Domain::UpdateDevice);
+		NODE_SET_PROTOTYPE_METHOD(t, "destroy",
+				Domain::Destroy);
+		NODE_SET_PROTOTYPE_METHOD(t, "undefine",
+				Domain::Undefine);
+		NODE_SET_PROTOTYPE_METHOD(t, "hasCurrentSnapshot",
+				Domain::HasCurrentSnapshot);
+		NODE_SET_PROTOTYPE_METHOD(t, "revertToSnapshot",
+				Domain::RevertToSnapshot);
+		NODE_SET_PROTOTYPE_METHOD(t, "takeSnapshot",
+				Domain::TakeSnapshot);
+		NODE_SET_PROTOTYPE_METHOD(t, "getCurrentSnapshot",
+				Domain::GetCurrentSnapshot);
+		NODE_SET_PROTOTYPE_METHOD(t, "deleteSnapshot",
+				Domain::DeleteSnapshot);
+		NODE_SET_PROTOTYPE_METHOD(t, "lookupSnapshotByName",
+				Domain::LookupSnapshotByName);
+		NODE_SET_PROTOTYPE_METHOD(t, "getSnapshots",
+				Domain::GetSnapshots);
 
-        constructor_template = Persistent<FunctionTemplate>::New(t);
-        constructor_template->SetClassName(String::NewSymbol("Domain"));
+		constructor_template = Persistent<FunctionTemplate>::New(t);
+		constructor_template->SetClassName(String::NewSymbol("Domain"));
 
-        Local<ObjectTemplate> object_tmpl = t->InstanceTemplate();
+		Local<ObjectTemplate> object_tmpl = t->InstanceTemplate();
 
-        //Constants initialization
-        //virDomainState
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_NOSTATE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_RUNNING);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCKED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_PAUSED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SHUTDOWN);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SHUTOFF);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_CRASHED);
+		//Constants initialization
+		//virDomainState
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_NOSTATE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_RUNNING);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCKED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_PAUSED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SHUTDOWN);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SHUTOFF);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_CRASHED);
 
 #ifdef VIR_DOMAIN_PMSUSPENDED
-        // If its available in libvirt.h, then make it available in node
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_PMSUSPENDED);
+		// If its available in libvirt.h, then make it available in node
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_PMSUSPENDED);
 #endif
 
-        //virDomainSnapshotCreateFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_REDEFINE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_CURRENT);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_HALT);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_REUSE_EXT);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_QUIESCE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_LIVE);
-
-        //virDomainSnapshotRevertFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_REVERT_RUNNING);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_REVERT_PAUSED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_REVERT_FORCE);
-
-        //virDomainSnapshotDeleteFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_DELETE_CHILDREN);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_DELETE_METADATA_ONLY);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_DELETE_CHILDREN_ONLY);
-
-        //virDomainDeviceModifyFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_DEVICE_MODIFY_CURRENT);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_DEVICE_MODIFY_LIVE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_DEVICE_MODIFY_CONFIG);
-
-        //virDomainBlockCommitFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_SHALLOW);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_DELETE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_ACTIVE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_RELATIVE);
-
-        //virDomainBlockRebaseFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_SHALLOW);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_REUSE_EXT);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_COPY_RAW);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_COPY);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_RELATIVE);
-
-        //virDomainMigrateFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_LIVE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_PEER2PEER);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_TUNNELLED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_PERSIST_DEST);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_UNDEFINE_SOURCE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_PAUSED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_NON_SHARED_DISK);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_NON_SHARED_INC);
-
-        //virDomainXMLFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_XML_SECURE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_XML_INACTIVE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_XML_UPDATE_CPU);
-
-        //virDomainJobType
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_NONE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_BOUNDED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_UNBOUNDED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_COMPLETED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_FAILED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_CANCELLED);
-
-        //virDomainMemoryFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MEMORY_VIRTUAL);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_MEMORY_PHYSICAL);
-
-        //virDomainEventType
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_DEFINED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_UNDEFINED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_RESUMED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED);
-
-        //virDomainEventIOErrorAction
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_IO_ERROR_NONE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_IO_ERROR_PAUSE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_IO_ERROR_REPORT);
-
-        //virDomainEventResumedDetailType
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_RESUMED_UNPAUSED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_RESUMED_MIGRATED);
-
-        //virDomainEventStartedDetailType
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_BOOTED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_MIGRATED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_RESTORED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_FROM_SNAPSHOT);
-
-        //virDomainEventStoppedDetailType
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_SHUTDOWN);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_DESTROYED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_CRASHED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_MIGRATED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_SAVED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_FAILED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_FROM_SNAPSHOT);
-
-        //virDomainEventSuspendedDetailType
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_PAUSED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_MIGRATED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_IOERROR);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_WATCHDOG);
-
-        //virDomainEventUndefinedDetailType
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_UNDEFINED_REMOVED);
-
-        //virDomainEventWatchdogAction
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_NONE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_PAUSE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_RESET);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_POWEROFF);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_SHUTDOWN);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_DEBUG);
-
-
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SEND_KEY_MAX_KEYS);
-
-        state_symbol        = NODE_PSYMBOL("state");
-        max_memory_symbol   = NODE_PSYMBOL("max_memory");
-        memory_symbol       = NODE_PSYMBOL("memory");
-        vcpus_number_symbol = NODE_PSYMBOL("vcpus_number");
-        cpu_time_symbol     = NODE_PSYMBOL("cpu_time");
-        number_symbol       = NODE_PSYMBOL("number");
-        cpu_symbol          = NODE_PSYMBOL("cpu");
-        affinity_symbol     = NODE_PSYMBOL("affinity");
-        usable_symbol       = NODE_PSYMBOL("usable");
-        migration_uri_symbol            = NODE_PSYMBOL("dest_uri");
-        migration_name_symbol           = NODE_PSYMBOL("dest_name");
-        migration_bandwidth_symbol      = NODE_PSYMBOL("bandwidth");
-        migration_flags_symbol          = NODE_PSYMBOL("flags");
-        migration_hypervisor_symbol     = NODE_PSYMBOL("dest_hypervisor");
-
-        type_symbol         = NODE_PSYMBOL("type");
-        time_symbol         = NODE_PSYMBOL("time");
-        data_symbol         = NODE_PSYMBOL("data");
-        file_symbol         = NODE_PSYMBOL("file");
-        elapsed_symbol      = NODE_PSYMBOL("elapsed");
-        remaining_symbol    = NODE_PSYMBOL("remaining");
-        total_symbol        = NODE_PSYMBOL("total");
-        processed_symbol    = NODE_PSYMBOL("processed");
-
-        label_symbol = NODE_PSYMBOL("label");
-        enforcing_symbol = NODE_PSYMBOL("enforcing");
-
-        memory_stat_swap_in_symbol = NODE_PSYMBOL("swap_in");
-        memory_stat_swap_out_symbol = NODE_PSYMBOL("swap_out");
-        memory_stat_major_fault_symbol = NODE_PSYMBOL("major_fault");
-        memory_stat_minor_fault_symbol = NODE_PSYMBOL("minor_fault");
-        memory_stat_unused_symbol = NODE_PSYMBOL("unused");
-        memory_stat_available_symbol = NODE_PSYMBOL("available");
-
-        block_stat_rd_req_symbol = NODE_PSYMBOL("read_requests");
-        block_stat_rd_bytes_symbol = NODE_PSYMBOL("read_bytes");
-        block_stat_wr_req_symbol = NODE_PSYMBOL("write_requests");
-        block_stat_wr_bytes_symbol = NODE_PSYMBOL("write_bytes");
-        block_stat_errs_symbol = NODE_PSYMBOL("errors");
-
-        block_info_capacity_symbol = NODE_PSYMBOL("capacity");
-        block_info_allocation_symbol = NODE_PSYMBOL("allocation");
-        block_info_physical_symbol = NODE_PSYMBOL("physical");
-
-        block_job_info_type_symbol = NODE_PSYMBOL("type");
-        block_job_info_bandwidth_symbol = NODE_PSYMBOL("bandwidth");
-        block_job_info_cur_symbol = NODE_PSYMBOL("cur");
-        block_job_info_end_symbol = NODE_PSYMBOL("end");
-
-        nwiface_stat_rx_bytes_symbol = NODE_PSYMBOL("rx_bytes");
-        nwiface_stat_rx_packets_symbol = NODE_PSYMBOL("rx_packets");
-        nwiface_stat_rx_errors_symbol = NODE_PSYMBOL("rx_errors");
-        nwiface_stat_rx_drop_symbol = NODE_PSYMBOL("rx_drop");
-        nwiface_stat_tx_bytes_symbol = NODE_PSYMBOL("tx_bytes");
-        nwiface_stat_tx_packets_symbol = NODE_PSYMBOL("tx_packets");
-        nwiface_stat_tx_errors_symbol = NODE_PSYMBOL("tx_errors");
-        nwiface_stat_tx_drop_symbol = NODE_PSYMBOL("tx_drop");
-    }
-
-    virDomainPtr Domain::domain() const {
-        return domain_;
-    }
-
-    void CreateDomainAsync(uv_work_t* req) {
-
-        CreateDomainBaton* baton = static_cast<CreateDomainBaton*>(req->data);
-
-        Hypervisor *hypervisor = baton->hypervisor;
-        const char *xml = baton->xml;
-        unsigned int flags = baton->flags;
-
-        virErrorPtr err;
-        Domain *domain = new Domain();
-
-        domain->domain_ = virDomainCreateXML(hypervisor->connection(), xml, flags);
-
-        if(domain->domain_ == NULL) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-
-        else {
-            baton->domain = domain;
-        }
-    }
-
-    void CreateDomainAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
-
-        CreateDomainBaton* baton = static_cast<CreateDomainBaton*>(req->data);
-        delete req;
-
-        Handle<Value> argv[2];
-
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
-
-        else {
-            Domain *domain = baton->domain;
-            Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
-            domain->Wrap(domain_obj);
-
-            argv[0] = Undefined();
-            argv[1] = scope.Close(domain_obj);
-        }
-
-        TryCatch try_catch;
-
-        if (try_catch.HasCaught())
-          FatalException(try_catch);
-
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
-
-    Handle<Value> Domain::Create(const Arguments& args) {
+		//virDomainSnapshotCreateFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_REDEFINE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_CURRENT);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_HALT);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_REUSE_EXT);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_QUIESCE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_CREATE_LIVE);
+
+		//virDomainSnapshotRevertFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_REVERT_RUNNING);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_REVERT_PAUSED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_REVERT_FORCE);
+
+		//virDomainSnapshotDeleteFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_DELETE_CHILDREN);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_DELETE_METADATA_ONLY);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SNAPSHOT_DELETE_CHILDREN_ONLY);
+
+		//virDomainDeviceModifyFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_DEVICE_MODIFY_CURRENT);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_DEVICE_MODIFY_LIVE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_DEVICE_MODIFY_CONFIG);
+
+		//virDomainBlockCommitFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_SHALLOW);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_DELETE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_ACTIVE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_COMMIT_RELATIVE);
+
+		//virDomainBlockRebaseFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_SHALLOW);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_REUSE_EXT);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_COPY_RAW);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_COPY);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_BLOCK_REBASE_RELATIVE);
+
+		//virDomainMigrateFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_LIVE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_PEER2PEER);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_TUNNELLED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_PERSIST_DEST);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_UNDEFINE_SOURCE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_PAUSED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_NON_SHARED_DISK);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MIGRATE_NON_SHARED_INC);
+
+		//virDomainXMLFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_XML_SECURE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_XML_INACTIVE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_XML_UPDATE_CPU);
+
+		//virDomainJobType
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_NONE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_BOUNDED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_UNBOUNDED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_COMPLETED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_FAILED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_JOB_CANCELLED);
+
+		//virDomainMemoryFlags
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MEMORY_VIRTUAL);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_MEMORY_PHYSICAL);
+
+		//virDomainEventType
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_DEFINED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_UNDEFINED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_RESUMED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED);
+
+		//virDomainEventIOErrorAction
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_IO_ERROR_NONE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_IO_ERROR_PAUSE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_IO_ERROR_REPORT);
+
+		//virDomainEventResumedDetailType
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_RESUMED_UNPAUSED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_RESUMED_MIGRATED);
+
+		//virDomainEventStartedDetailType
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_BOOTED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_MIGRATED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_RESTORED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STARTED_FROM_SNAPSHOT);
+
+		//virDomainEventStoppedDetailType
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_SHUTDOWN);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_DESTROYED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_CRASHED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_MIGRATED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_SAVED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_FAILED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_STOPPED_FROM_SNAPSHOT);
+
+		//virDomainEventSuspendedDetailType
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_PAUSED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_MIGRATED);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_IOERROR);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_SUSPENDED_WATCHDOG);
+
+		//virDomainEventUndefinedDetailType
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_UNDEFINED_REMOVED);
+
+		//virDomainEventWatchdogAction
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_NONE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_PAUSE);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_RESET);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_POWEROFF);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_SHUTDOWN);
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_WATCHDOG_DEBUG);
+
+
+		NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_SEND_KEY_MAX_KEYS);
+
+		state_symbol        = NODE_PSYMBOL("state");
+		max_memory_symbol   = NODE_PSYMBOL("max_memory");
+		memory_symbol       = NODE_PSYMBOL("memory");
+		vcpus_number_symbol = NODE_PSYMBOL("vcpus_number");
+		cpu_time_symbol     = NODE_PSYMBOL("cpu_time");
+		number_symbol       = NODE_PSYMBOL("number");
+		cpu_symbol          = NODE_PSYMBOL("cpu");
+		affinity_symbol     = NODE_PSYMBOL("affinity");
+		usable_symbol       = NODE_PSYMBOL("usable");
+		migration_uri_symbol            = NODE_PSYMBOL("dest_uri");
+		migration_name_symbol           = NODE_PSYMBOL("dest_name");
+		migration_bandwidth_symbol      = NODE_PSYMBOL("bandwidth");
+		migration_flags_symbol          = NODE_PSYMBOL("flags");
+		migration_hypervisor_symbol     = NODE_PSYMBOL("dest_hypervisor");
+
+		type_symbol         = NODE_PSYMBOL("type");
+		time_symbol         = NODE_PSYMBOL("time");
+		data_symbol         = NODE_PSYMBOL("data");
+		file_symbol         = NODE_PSYMBOL("file");
+		elapsed_symbol      = NODE_PSYMBOL("elapsed");
+		remaining_symbol    = NODE_PSYMBOL("remaining");
+		total_symbol        = NODE_PSYMBOL("total");
+		processed_symbol    = NODE_PSYMBOL("processed");
+
+		label_symbol = NODE_PSYMBOL("label");
+		enforcing_symbol = NODE_PSYMBOL("enforcing");
+
+		memory_stat_swap_in_symbol = NODE_PSYMBOL("swap_in");
+		memory_stat_swap_out_symbol = NODE_PSYMBOL("swap_out");
+		memory_stat_major_fault_symbol = NODE_PSYMBOL("major_fault");
+		memory_stat_minor_fault_symbol = NODE_PSYMBOL("minor_fault");
+		memory_stat_unused_symbol = NODE_PSYMBOL("unused");
+		memory_stat_available_symbol = NODE_PSYMBOL("available");
+
+		block_stat_rd_req_symbol = NODE_PSYMBOL("read_requests");
+		block_stat_rd_bytes_symbol = NODE_PSYMBOL("read_bytes");
+		block_stat_wr_req_symbol = NODE_PSYMBOL("write_requests");
+		block_stat_wr_bytes_symbol = NODE_PSYMBOL("write_bytes");
+		block_stat_errs_symbol = NODE_PSYMBOL("errors");
+
+		block_info_capacity_symbol = NODE_PSYMBOL("capacity");
+		block_info_allocation_symbol = NODE_PSYMBOL("allocation");
+		block_info_physical_symbol = NODE_PSYMBOL("physical");
+
+		block_job_info_type_symbol = NODE_PSYMBOL("type");
+		block_job_info_bandwidth_symbol = NODE_PSYMBOL("bandwidth");
+		block_job_info_cur_symbol = NODE_PSYMBOL("cur");
+		block_job_info_end_symbol = NODE_PSYMBOL("end");
+
+		nwiface_stat_rx_bytes_symbol = NODE_PSYMBOL("rx_bytes");
+		nwiface_stat_rx_packets_symbol = NODE_PSYMBOL("rx_packets");
+		nwiface_stat_rx_errors_symbol = NODE_PSYMBOL("rx_errors");
+		nwiface_stat_rx_drop_symbol = NODE_PSYMBOL("rx_drop");
+		nwiface_stat_tx_bytes_symbol = NODE_PSYMBOL("tx_bytes");
+		nwiface_stat_tx_packets_symbol = NODE_PSYMBOL("tx_packets");
+		nwiface_stat_tx_errors_symbol = NODE_PSYMBOL("tx_errors");
+		nwiface_stat_tx_drop_symbol = NODE_PSYMBOL("tx_drop");
+	}
+
+	virDomainPtr Domain::domain() const {
+		return domain_;
+	}
+
+	void CreateDomainAsync(uv_work_t* req) {
+
+		CreateDomainBaton* baton = static_cast<CreateDomainBaton*>(req->data);
+
+		Hypervisor *hypervisor = baton->hypervisor;
+		const char *xml = baton->xml;
+		unsigned int flags = baton->flags;
+
+		virErrorPtr err;
+		Domain *domain = new Domain();
+
+		domain->domain_ = virDomainCreateXML(hypervisor->connection(), xml, flags);
+
+		if(domain->domain_ == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		else {
+			baton->domain = domain;
+		}
+	}
+
+	void CreateDomainAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		CreateDomainBaton* baton = static_cast<CreateDomainBaton*>(req->data);
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			Domain *domain = baton->domain;
+			Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+			domain->Wrap(domain_obj);
+
+			argv[0] = Undefined();
+			argv[1] = scope.Close(domain_obj);
+		}
+
+		TryCatch try_catch;
+
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+	Handle<Value> Domain::Create(const Arguments& args) {
 
-        HandleScope scope;
-        unsigned int flags = 0;
-
-        if(!args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as first argument")));
-        }
+		HandleScope scope;
+		unsigned int flags = 0;
+
+		if(!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as first argument")));
+		}
 
-        if(!args[1]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("Second argument, if specified, must be an array")));
-        }
-
-        // Flags
-        Local<Array> flags_ = Local<Array>::Cast(args[1]);
-        unsigned int length = flags_->Length();
-
-        for (unsigned int i = 0; i < length; i++) {
-            flags |= flags_->Get(Integer::New(i))->Int32Value();
-        }
-
-        Local<Object> hyp_obj = args.This();
-
-        if(!Hypervisor::HasInstance(hyp_obj)) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor object instance")));
-        }
-
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
-
-        const char *xml = parseString(args[0]);
-
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[2]);
+		if(!args[1]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("Second argument, if specified, must be an array")));
+		}
+
+		// Flags
+		Local<Array> flags_ = Local<Array>::Cast(args[1]);
+		unsigned int length = flags_->Length();
+
+		for (unsigned int i = 0; i < length; i++) {
+			flags |= flags_->Get(Integer::New(i))->Int32Value();
+		}
+
+		Local<Object> hyp_obj = args.This();
 
-        // Create baton; add callback, hypervisor, flags, and xml
-        CreateDomainBaton* baton = new CreateDomainBaton();
+		if(!Hypervisor::HasInstance(hyp_obj)) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a Hypervisor object instance")));
+		}
 
-        baton->callback = Persistent<Function>::New(callback);
-        baton->hypervisor = hypervisor;
-        baton->flags = flags;
-        baton->xml = xml;
+		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        // Compose req
-        uv_work_t* req = new uv_work_t();
-        req->data = baton;
+		const char *xml = parseString(args[0]);
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            CreateDomainAsync,
-            (uv_after_work_cb)CreateDomainAsyncAfter
-        );
-
-        return scope.Close(Undefined());
-    }
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[2]);
 
-    Handle<Value> Domain::Define(const Arguments& args) {
-        HandleScope scope;
+		// Create baton; add callback, hypervisor, flags, and xml
+		CreateDomainBaton* baton = new CreateDomainBaton();
 
-        int argsl = args.Length();
+		baton->callback = Persistent<Function>::New(callback);
+		baton->hypervisor = hypervisor;
+		baton->flags = flags;
+		baton->xml = xml;
 
-        if(argsl == 0) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify at least one argument")));
-        }
+		// Compose req
+		uv_work_t* req = new uv_work_t();
+		req->data = baton;
+
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				CreateDomainAsync,
+				(uv_after_work_cb)CreateDomainAsyncAfter
+				);
+
+		return scope.Close(Undefined());
+	}
+
+	Handle<Value> Domain::Define(const Arguments& args) {
+		HandleScope scope;
+
+		int argsl = args.Length();
+
+		if(argsl == 0) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify at least one argument")));
+		}
 
-        if(!args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as first argument")));
-        }
+		if(!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as first argument")));
+		}
+
+		Local<Object> hyp_obj = args.This();
+
+		if(!Hypervisor::HasInstance(hyp_obj)) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a Hypervisor instance")));
+		}
 
-        Local<Object> hyp_obj = args.This();
+		String::Utf8Value xml(args[0]->ToString());
+
+		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        if(!Hypervisor::HasInstance(hyp_obj)) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor instance")));
-        }
+		Domain *domain = new Domain();
+		domain->domain_ = virDomainDefineXML(hypervisor->connection(), (const char *) *xml);
 
-        String::Utf8Value xml(args[0]->ToString());
+		if(domain->domain_ == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+		Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+
+		domain->Wrap(domain_obj);
 
-        Domain *domain = new Domain();
-        domain->domain_ = virDomainDefineXML(hypervisor->connection(), (const char *) *xml);
+		return scope.Close(domain_obj);
+	}
 
-        if(domain->domain_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+	Handle<Value> Domain::Undefine(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		ret = virDomainUndefine(domain->domain_);
+
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
+
+		return True();
+	}
+
+	void LookupDomainByIdAsync(uv_work_t* req) {
+		LookupDomainByIdBaton* baton = static_cast<LookupDomainByIdBaton*>(req->data);
+
+		int id = baton->id;
+		Hypervisor *hypervisor = baton->hypervisor;
+		virErrorPtr err;
+
+		Domain *domain = new Domain();
+		domain->domain_ = virDomainLookupByID(hypervisor->connection(), id);
+
+		if (domain->domain_ == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		else {
+			baton->domain = domain;
+		}
+	}
+
+	void LookupDomainByIdAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		LookupDomainByIdBaton* baton = static_cast<LookupDomainByIdBaton*>(req->data);
+		delete req;
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+		else {
+			Domain *domain = baton->domain;
+			Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+			domain->Wrap(domain_obj);
+
+			argv[0] = Undefined();
+			argv[1] = scope.Close(domain_obj);
+		}
+
+		TryCatch try_catch;
 
-        Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        domain->Wrap(domain_obj);
+	Handle<Value> Domain::LookupById(const Arguments& args) {
+		HandleScope scope;
+		int id = -1;
+
+		// Create baton
+		LookupDomainByIdBaton* baton = new LookupDomainByIdBaton();
 
-        return scope.Close(domain_obj);
-    }
+		if(args.Length() == 0 || !args[0]->IsInt32()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a domain id as an int")));
+		}
 
-    Handle<Value> Domain::Undefine(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		Local<Object> hyp_obj = args.This();
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        ret = virDomainUndefine(domain->domain_);
+		if(!Hypervisor::HasInstance(hyp_obj)) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a Hypervisor instance")));
+		}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		id = args[0]->Int32Value();
+		// Unwrap hypervisor
+		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        return True();
-    }
-    void LookupDomainByIdAsync(uv_work_t* req) {
-        LookupDomainByIdBaton* baton = static_cast<LookupDomainByIdBaton*>(req->data);
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[1]);
 
-        int id = baton->id;
-        Hypervisor *hypervisor = baton->hypervisor;
-        virErrorPtr err;
+		// Add callback, name, and hypervisor
+		baton->callback = Persistent<Function>::New(callback);
+		baton->id = id;
+		baton->hypervisor = hypervisor;
 
-        Domain *domain = new Domain();
-        domain->domain_ = virDomainLookupByID(hypervisor->connection(), id);
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-       if (domain->domain_ == NULL) {
-            err = virGetLastError();
-            baton->error = err->message;
-       }
+		// Dispatch work
+		uv_queue_work(
+			uv_default_loop(),
+			req,
+			LookupDomainByIdAsync,
+			(uv_after_work_cb)LookupDomainByIdAsyncAfter
+		);
 
-       else {
-            baton->domain = domain;
-       }
+		return scope.Close(Undefined());
+	}
 
-    }
+	void LookupDomainByNameAsync(uv_work_t* req) {
+		LookupDomainByNameBaton* baton = static_cast<LookupDomainByNameBaton*>(req->data);
 
-    void LookupDomainByIdAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
+		const char* name = baton->name;
+		Hypervisor *hypervisor = baton->hypervisor;
+		virErrorPtr err;
 
-        LookupDomainByIdBaton* baton = static_cast<LookupDomainByIdBaton*>(req->data);
-        delete req;
-        Handle<Value> argv[2];
+		Domain *domain = new Domain();
+		domain->domain_ = virDomainLookupByName(hypervisor->connection(), name);
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		if(domain->domain_ == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
 
-        else {
-            Domain *domain = baton->domain;
-            Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
-            domain->Wrap(domain_obj);
+		else {
+			baton->domain = domain;
+		}
+	}
 
-            argv[0] = Undefined();
-            argv[1] = scope.Close(domain_obj);
-        }
+	void LookupDomainByNameAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
 
-        TryCatch try_catch;
+		LookupDomainByNameBaton* baton = static_cast<LookupDomainByNameBaton*>(req->data);
+		delete req;
+		Handle<Value> argv[2];
 
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		else {
+			Domain *domain = baton->domain;
+			Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+			domain->Wrap(domain_obj);
 
-    Handle<Value> Domain::LookupById(const Arguments& args) {
-        HandleScope scope;
+			argv[0] = Undefined();
+			argv[1] = scope.Close(domain_obj);
+		}
 
-        int id = -1;
+		TryCatch try_catch;
 
-        if(args.Length() == 0 || !args[0]->IsInt32()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a valid Domain Id.")));
-        }
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        Local<Object> hyp_obj = args.This();
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        if(!Hypervisor::HasInstance(hyp_obj)) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor instance")));
-        }
+	Handle<Value> Domain::LookupByName(const Arguments& args) {
+		HandleScope scope;
 
-        id = args[0]->Int32Value();
-        // Unwrap hypervisor
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a domain name as a string")));
+		}
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[1]);
+		Local<Object> hyp_obj = args.This();
 
-        // Create baton
-        LookupDomainByIdBaton* baton = new LookupDomainByIdBaton();
+		if(!Hypervisor::HasInstance(hyp_obj)) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a Hypervisor instance")));
+		}
 
-        // Add callback, name, and hypervisor
-        baton->callback = Persistent<Function>::New(callback);
-        baton->id = id;
-        baton->hypervisor = hypervisor;
+		const char* name = parseString(args[0]);
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+		// Unwrap hypervisor
+		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            LookupDomainByIdAsync,
-            (uv_after_work_cb)LookupDomainByIdAsyncAfter
-        );
-        delete req;
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[1]);
 
-        return scope.Close(Undefined());
-    }
+		// Create baton
+		LookupDomainByNameBaton* baton = new LookupDomainByNameBaton();
 
-    void LookupDomainByNameAsync(uv_work_t* req) {
-        LookupDomainByNameBaton* baton = static_cast<LookupDomainByNameBaton*>(req->data);
+		// Add callback, name, and hypervisor
+		baton->callback = Persistent<Function>::New(callback);
+		baton->name = name;
+		baton->hypervisor = hypervisor;
 
-        const char* name = baton->name;
-        Hypervisor *hypervisor = baton->hypervisor;
-        virErrorPtr err;
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        Domain *domain = new Domain();
-        domain->domain_ = virDomainLookupByName(hypervisor->connection(), name);
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				LookupDomainByNameAsync,
+				(uv_after_work_cb)LookupDomainByNameAsyncAfter
+				);
 
-        if(domain->domain_ == NULL) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
+		return scope.Close(Undefined());
+	}
 
-        else {
-            baton->domain = domain;
-        }
-    }
+	Handle<Value> Domain::LookupByUUID(const Arguments& args) {
+		HandleScope scope;
 
-    void LookupDomainByNameAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a UUID string.")));
+		}
 
-        LookupDomainByNameBaton* baton = static_cast<LookupDomainByNameBaton*>(req->data);
-        delete req;
+		Local<Object> hyp_obj = args.This();
 
-        Handle<Value> argv[2];
+		if(!Hypervisor::HasInstance(hyp_obj)) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a Hypervisor instance")));
+		}
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		String::Utf8Value uuid(args[0]->ToString());
 
-        else {
-            Domain *domain = baton->domain;
-            Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
-            domain->Wrap(domain_obj);
+		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-            argv[0] = Undefined();
-            argv[1] = scope.Close(domain_obj);
-        }
+		Domain *domain = new Domain();
+		domain->domain_ = virDomainLookupByUUIDString(hypervisor->connection(), (const char *) *uuid);
 
-        TryCatch try_catch;
+		if(domain->domain_ == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        if (try_catch.HasCaught())
-          FatalException(try_catch);
+		Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		domain->Wrap(domain_obj);
 
-    Handle<Value> Domain::LookupByName(const Arguments& args) {
-        HandleScope scope;
+		return scope.Close(domain_obj);
+	}
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a domain name as a string")));
-        }
+	Handle<Value> Domain::GetId(const Arguments& args) {
+		HandleScope scope;
+		unsigned int id = -1;
 
-        Local<Object> hyp_obj = args.This();
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(!Hypervisor::HasInstance(hyp_obj)) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor instance")));
-        }
+		id = virDomainGetID(domain->domain_);
 
-        const char* name = parseString(args[0]);
+		if(id == -1u) {
+			if (virGetLastError() != NULL) {
+				ThrowException(Error::New(virGetLastError()));
+			}
 
-        // Unwrap hypervisor
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+			return Null();
+		}
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[1]);
+		return scope.Close(Integer::NewFromUnsigned(id));
+	}
 
-        // Create baton
-        LookupDomainByNameBaton* baton = new LookupDomainByNameBaton();
+	void GetInfoAsync(uv_work_t* req) {
+		GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
 
-        // Add callback, name, and hypervisor
-        baton->callback = Persistent<Function>::New(callback);
-        baton->name = name;
-        baton->hypervisor = hypervisor;
+		Domain *domain = baton->domain;
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+		virDomainInfo info;
+		virErrorPtr err;
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            LookupDomainByNameAsync,
-            (uv_after_work_cb)LookupDomainByNameAsyncAfter
-        );
+		int ret = -1;
 
-        return scope.Close(Undefined());
-    }
+		ret = virDomainGetInfo(domain->domain_, &info);
 
-    Handle<Value> Domain::LookupByUUID(const Arguments& args) {
-        HandleScope scope;
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a UUID string.")));
-        }
+		else {
+			baton->res = info;
+		}
+	}
 
-        Local<Object> hyp_obj = args.This();
+	void GetInfoAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
 
-        if(!Hypervisor::HasInstance(hyp_obj)) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor instance")));
-        }
+		GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
+		delete req;
 
-        String::Utf8Value uuid(args[0]->ToString());
+		Handle<Value> argv[2];
 
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+		virDomainInfo res = baton->res;
 
-        Domain *domain = new Domain();
-        domain->domain_ = virDomainLookupByUUIDString(hypervisor->connection(), (const char *) *uuid);
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        if(domain->domain_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		else {
+			Local<Object> object = Object::New();
 
-        Local<Object> domain_obj = domain->constructor_template->GetFunction()->NewInstance();
+			object->Set(state_symbol, Integer::New(res.state)); //virDomainState
+			object->Set(max_memory_symbol, Number::New(res.maxMem)); //KBytes
+			object->Set(memory_symbol, Number::New(res.memory)); //KBytes
+			object->Set(vcpus_number_symbol, Integer::New(res.nrVirtCpu));
+			object->Set(cpu_time_symbol, Number::New(res.cpuTime)); //nanoseconds
 
-        domain->Wrap(domain_obj);
+			argv[0] = Undefined();
+			argv[1] = scope.Close(object);
+		}
 
-        return scope.Close(domain_obj);
-    }
+		TryCatch try_catch;
 
-    Handle<Value> Domain::GetId(const Arguments& args) {
-        HandleScope scope;
-        unsigned int id = -1;
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        id = virDomainGetID(domain->domain_);
+	Handle<Value> Domain::GetInfo(const Arguments& args) {
+		HandleScope scope;
 
-        if(id == -1u) {
-            if (virGetLastError() != NULL) {
-                ThrowException(Error::New(virGetLastError()));
-            }
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-            return Null();
-        }
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[0]);
 
-        return scope.Close(Integer::NewFromUnsigned(id));
-    }
+		// Create baton
+		GetInfoBaton* baton = new GetInfoBaton();
 
-    void GetInfoAsync(uv_work_t* req) {
-        GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
+		// Add callback and domain
+		baton->callback = Persistent<Function>::New(callback);
+		baton->domain = domain;
 
-        Domain *domain = baton->domain;
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        virDomainInfo info;
-        virErrorPtr err;
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				GetInfoAsync,
+				(uv_after_work_cb)GetInfoAsyncAfter
+				);
 
-        int ret = -1;
+		return Undefined();
+	}
 
-        ret = virDomainGetInfo(domain->domain_, &info);
+	Handle<Value> Domain::GetName(const Arguments& args) {
+		HandleScope scope;
+		const char *name = NULL;
 
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        else {
-            baton->res = info;
-        }
-    }
+		name = virDomainGetName(domain->domain_);
 
-    void GetInfoAsyncAfter(uv_work_t* req) {
-      HandleScope scope;
+		if(name == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-      GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
-      delete req;
+		return scope.Close(String::New(name));
+	}
 
-      Handle<Value> argv[2];
+	Handle<Value> Domain::GetUUID(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
+		char *uuid = new char[VIR_UUID_STRING_BUFLEN];
 
-      virDomainInfo res = baton->res;
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-      if (!baton->error.empty()) {
-        argv[0] = Exception::Error(String::New(baton->error.c_str()));
-        argv[1] = Undefined();
-      }
+		ret = virDomainGetUUIDString(domain->domain_, uuid);
 
-      else {
-        Local<Object> object = Object::New();
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			delete[] uuid;
+			return Null();
+		}
 
-        object->Set(state_symbol, Integer::New(res.state)); //virDomainState
-        object->Set(max_memory_symbol, Number::New(res.maxMem)); //KBytes
-        object->Set(memory_symbol, Number::New(res.memory)); //KBytes
-        object->Set(vcpus_number_symbol, Integer::New(res.nrVirtCpu));
-        object->Set(cpu_time_symbol, Number::New(res.cpuTime)); //nanoseconds
+		Local<String> uuid_str = String::New(uuid);
 
-        argv[0] = Undefined();
-        argv[1] = scope.Close(object);
-      }
+		delete[] uuid;
 
-      TryCatch try_catch;
+		return scope.Close(uuid_str);
+	}
 
-      if (try_catch.HasCaught())
-        FatalException(try_catch);
+	Handle<Value> Domain::GetAutostart(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
+		int autostart_;
 
-      baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-      delete baton;
-    }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::GetInfo(const Arguments& args) {
-      HandleScope scope;
+		ret = virDomainGetAutostart(domain->domain_, &autostart_);
 
-      // Domain context
-      Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-      // Callback
-      Local<Function> callback = Local<Function>::Cast(args[0]);
+		bool autostart = autostart_ == 0 ? true : false;
 
-      // Create baton
-      GetInfoBaton* baton = new GetInfoBaton();
+		return scope.Close(Boolean::New(autostart));
+	}
 
-      // Add callback and domain
-      baton->callback = Persistent<Function>::New(callback);
-      baton->domain = domain;
+	Handle<Value> Domain::SetAutostart(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-      // Compose req
-      uv_work_t* req = new uv_work_t;
-      req->data = baton;
+		if(args.Length() == 0 || !args[0]->IsBoolean()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a boolean argument")));
+		}
 
-      // Dispatch work
-      uv_queue_work(
-        uv_default_loop(),
-        req,
-        GetInfoAsync,
-        (uv_after_work_cb)GetInfoAsyncAfter
-      );
+		bool autostart = args[0]->IsTrue();
 
-      return Undefined();
-    }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::GetName(const Arguments& args) {
-        HandleScope scope;
-        const char *name = NULL;
+		ret = virDomainSetAutostart(domain->domain_, autostart ? 0 : 1);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        name = virDomainGetName(domain->domain_);
+		return True();
+	}
 
-        if(name == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+	Handle<Value> Domain::GetMaxMemory(const Arguments& args) {
+		HandleScope scope;
+		unsigned long memory = 0;
 
-        return scope.Close(String::New(name));
-    }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::GetUUID(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
-        char *uuid = new char[VIR_UUID_STRING_BUFLEN];
+		memory = virDomainGetMaxMemory(domain->domain_);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(memory == 0) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        ret = virDomainGetUUIDString(domain->domain_, uuid);
+		return scope.Close(Number::New(memory));
+	}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            delete[] uuid;
-            return Null();
-        }
+	Handle<Value> Domain::SetMaxMemory(const Arguments& args) {
+		HandleScope scope;
+		unsigned long memory = 0;
+		int ret = -1;
 
-        Local<String> uuid_str = String::New(uuid);
+		if(args.Length() == 0 || !args[0]->IsInt32()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a valid amount of memory")));
+		}
 
-        delete[] uuid;
+		memory = args[0]->Int32Value();
 
-        return scope.Close(uuid_str);
-    }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::GetAutostart(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
-        int autostart_;
+		ret = virDomainSetMaxMemory(domain->domain_, memory);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        ret = virDomainGetAutostart(domain->domain_, &autostart_);
+		return True();
+	}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+	Handle<Value> Domain::SetMemory(const Arguments& args) {
+		HandleScope scope;
+		unsigned long memory = 0;
+		int ret = -1;
 
-        bool autostart = autostart_ == 0 ? true : false;
+		if(args.Length() == 0 || !args[0]->IsInt32()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a valid amount of memory")));
+		}
 
-        return scope.Close(Boolean::New(autostart));
-    }
+		memory = args[0]->Int32Value();
 
-    Handle<Value> Domain::SetAutostart(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(args.Length() == 0 || !args[0]->IsBoolean()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a boolean argument")));
-        }
+		ret = virDomainSetMemory(domain->domain_, memory);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        bool autostart = args[0]->IsTrue();
+		return True();
+	}
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+	Handle<Value> Domain::GetOsType(const Arguments& args) {
+		HandleScope scope;
+		char *os_type = NULL;
 
-        ret = virDomainSetAutostart(domain->domain_, autostart ? 0 : 1);
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		os_type = virDomainGetOSType(domain->domain_);
 
-        return True();
-    }
+		if(os_type == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-    Handle<Value> Domain::GetMaxMemory(const Arguments& args) {
-        HandleScope scope;
-        unsigned long memory = 0;
+		return scope.Close(String::New(os_type));
+	}
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+	Handle<Value> Domain::GetMaxVcpus(const Arguments& args) {
+		HandleScope scope;
+		int vcpus = -1;
 
-        memory = virDomainGetMaxMemory(domain->domain_);
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(memory == 0) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		vcpus = virDomainGetMaxVcpus(domain->domain_);
 
-        return scope.Close(Number::New(memory));
-    }
+		if(vcpus == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-    Handle<Value> Domain::SetMaxMemory(const Arguments& args) {
-        HandleScope scope;
-        unsigned long memory = 0;
-        int ret = -1;
+		return scope.Close(Integer::New(vcpus));
+	}
 
-        if(args.Length() == 0 || !args[0]->IsInt32()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a valid amount of memory")));
-        }
+	Handle<Value> Domain::IsActive(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-        memory = args[0]->Int32Value();
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		ret = virDomainIsActive(domain->domain_);
 
-        ret = virDomainSetMaxMemory(domain->domain_, memory);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+		bool is_active = ret == 1 ? true : false;
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		return scope.Close(Boolean::New(is_active));
+	}
 
-        return True();
-    }
+	Handle<Value> Domain::IsPersistent(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-    Handle<Value> Domain::SetMemory(const Arguments& args) {
-        HandleScope scope;
-        unsigned long memory = 0;
-        int ret = -1;
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(args.Length() == 0 || !args[0]->IsInt32()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a valid amount of memory")));
-        }
+		ret = virDomainIsPersistent(domain->domain_);
 
-        memory = args[0]->Int32Value();
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+		bool is_persistent = ret == 1 ? true : false;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		return scope.Close(Boolean::New(is_persistent));
+	}
 
-        ret = virDomainSetMemory(domain->domain_, memory);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+	Handle<Value> Domain::IsUpdated(const Arguments& args) {
+		HandleScope scope;
 
-        return True();
-    }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::GetOsType(const Arguments& args) {
-        HandleScope scope;
-        char *os_type = NULL;
+		int ret = virDomainIsUpdated(domain->domain_);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        os_type = virDomainGetOSType(domain->domain_);
+		return scope.Close(Boolean::New(ret == 1));
+	}
 
-        if(os_type == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+	Handle<Value> Domain::Reboot(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		int ret = -1;
 
-        return scope.Close(String::New(os_type));
-    }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::GetMaxVcpus(const Arguments& args) {
-        HandleScope scope;
-        int vcpus = -1;
+		ret = virDomainReboot(domain->domain_, flags);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        vcpus = virDomainGetMaxVcpus(domain->domain_);
+		return True();
+	}
 
-        if(vcpus == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+	Handle<Value> Domain::Reset(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		int ret = -1;
 
-        return scope.Close(Integer::New(vcpus));
-    }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::IsActive(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		ret = virDomainReset(domain->domain_, flags);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        ret = virDomainIsActive(domain->domain_);
+		return True();
+	}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        bool is_active = ret == 1 ? true : false;
+	Handle<Value> Domain::Save(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-        return scope.Close(Boolean::New(is_active));
-    }
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as function argument")));
+		}
 
-    Handle<Value> Domain::IsPersistent(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		String::Utf8Value path(args[0]->ToString());
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        ret = virDomainIsPersistent(domain->domain_);
+		ret = virDomainSave(domain->domain_, (const char *) *path);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        bool is_persistent = ret == 1 ? true : false;
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        return scope.Close(Boolean::New(is_persistent));
-    }
+		return True();
+	}
 
-    Handle<Value> Domain::IsUpdated(const Arguments& args) {
-        HandleScope scope;
+	Handle<Value> Domain::Restore(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as function argument")));
+		}
 
-        int ret = virDomainIsUpdated(domain->domain_);
+		Local<Object> hyp_obj = args.This();
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		if(!Hypervisor::HasInstance(hyp_obj)) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a Hypervisor object instance")));
+		}
 
-        return scope.Close(Boolean::New(ret == 1));
-    }
+		String::Utf8Value path(args[0]->ToString());
 
-    Handle<Value> Domain::Reboot(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
+		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		ret = virDomainRestore(hypervisor->connection(), (const char *) *path);
 
-        ret = virDomainReboot(domain->domain_, flags);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		return True();
+	}
 
-        return True();
-    }
+	void SuspendAsync(uv_work_t* req) {
+		SuspendBaton* baton = static_cast<SuspendBaton*>(req->data);
+		Domain *domain = baton->domain;
+		virErrorPtr err;
 
-    Handle<Value> Domain::Reset(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
+		int ret = -1;
+		ret = virDomainSuspend(domain->domain_);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+		baton->res = ret;
+	}
 
-        ret = virDomainReset(domain->domain_, flags);
+	void SuspendAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		SuspendBaton* baton = static_cast<SuspendBaton*>(req->data);
+		delete req;
 
-        return True();
-    }
+		Handle<Value> argv[2];
 
-    Handle<Value> Domain::Save(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as function argument")));
-        }
+		else {
+			argv[0] = Undefined();
+			argv[1] = scope.Close(True());
+		}
 
-        String::Utf8Value path(args[0]->ToString());
+		TryCatch try_catch;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        ret = virDomainSave(domain->domain_, (const char *) *path);
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+	Handle<Value> Domain::Suspend(const Arguments& args) {
+		HandleScope scope;
 
-        return True();
-    }
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::Restore(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		// Create baton
+		SuspendBaton* baton = new SuspendBaton();
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as function argument")));
-        }
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[0]);
+		baton->callback = Persistent<Function>::New(callback);
 
-        Local<Object> hyp_obj = args.This();
+		// Add data
+		baton->domain = domain;
 
-        if(!Hypervisor::HasInstance(hyp_obj)) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor object instance")));
-        }
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        String::Utf8Value path(args[0]->ToString());
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				SuspendAsync,
+				(uv_after_work_cb)SuspendAsyncAfter
+				);
 
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+		return scope.Close(Undefined());
+	}
 
-        ret = virDomainRestore(hypervisor->connection(), (const char *) *path);
+	void ResumeAsync(uv_work_t* req) {
+		ResumeBaton* baton = static_cast<ResumeBaton*>(req->data);
+		Domain *domain = baton->domain;
+		virErrorPtr err;
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		int ret = -1;
+		ret = virDomainResume(domain->domain_);
 
-        return True();
-    }
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
 
-    void SuspendAsync(uv_work_t* req) {
-        SuspendBaton* baton = static_cast<SuspendBaton*>(req->data);
-        Domain *domain = baton->domain;
-        virErrorPtr err;
+		baton->res = ret;
+	}
 
-        int ret = -1;
-        ret = virDomainSuspend(domain->domain_);
+	void ResumeAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
 
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-        baton->res = ret;
-    }
+		ResumeBaton* baton = static_cast<ResumeBaton*>(req->data);
+		delete req;
 
-    void SuspendAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
+		Handle<Value> argv[2];
 
-        SuspendBaton* baton = static_cast<SuspendBaton*>(req->data);
-        delete req;
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        Handle<Value> argv[2];
+		else {
+			argv[0] = Undefined();
+			argv[1] = scope.Close(True());
+		}
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		TryCatch try_catch;
 
-        else {
-            argv[0] = Undefined();
-            argv[1] = scope.Close(True());
-        }
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        TryCatch try_catch;
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
+	Handle<Value> Domain::Resume(const Arguments& args) {
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		ResumeBaton* baton = new ResumeBaton();
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    Handle<Value> Domain::Suspend(const Arguments& args) {
-        HandleScope scope;
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[0]);
+		baton->callback = Persistent<Function>::New(callback);
 
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		// Add data
+		baton->domain = domain;
 
-        // Create baton
-        SuspendBaton* baton = new SuspendBaton();
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[0]);
-        baton->callback = Persistent<Function>::New(callback);
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				ResumeAsync,
+				(uv_after_work_cb)ResumeAsyncAfter
+				);
 
-        // Add data
-        baton->domain = domain;
+		return Undefined();
+	}
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+	Handle<Value> Domain::Shutdown(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            SuspendAsync,
-            (uv_after_work_cb)SuspendAsyncAfter
-        );
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		ret = virDomainShutdown(domain->domain_);
 
-        return scope.Close(Undefined());
-    }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-    void ResumeAsync(uv_work_t* req) {
-        ResumeBaton* baton = static_cast<ResumeBaton*>(req->data);
-        Domain *domain = baton->domain;
-        virErrorPtr err;
+		return True();
+	}
 
-        int ret = -1;
-        ret = virDomainResume(domain->domain_);
+	Handle<Value> Domain::Start(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        baton->res = ret;
-    }
+		ret = virDomainCreate(domain->domain_);
 
-    void ResumeAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
+		return True();
+	}
 
-        ResumeBaton* baton = static_cast<ResumeBaton*>(req->data);
-        delete req;
+	Handle<Value> Domain::SendKey(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-        Handle<Value> argv[2];
+		if(args.Length() == 0) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify arguments to invoke this function")));
+		}
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		if(!args[0]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("Argument must be an array of objects")));
+		}
 
-        else {
-            argv[0] = Undefined();
-            argv[1] = scope.Close(True());
-        }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        TryCatch try_catch;
+		unsigned int keycodes[VIR_DOMAIN_SEND_KEY_MAX_KEYS];
 
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
+		Local<Array> keycodes_ = Local<Array>::Cast(args[0]);
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		unsigned int length = keycodes_->Length();
 
-    Handle<Value> Domain::Resume(const Arguments& args) {
+		for(unsigned int i = 0; i < length; i++) {
+			keycodes[i] = (unsigned int) keycodes_->Get(Integer::New(i))->Int32Value();
+		}
 
-        ResumeBaton* baton = new ResumeBaton();
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		ret = virDomainSendKey(domain->domain_, 0, 150, keycodes, length, 0);
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[0]);
-        baton->callback = Persistent<Function>::New(callback);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
+		return True();
+	}
 
-        // Add data
-        baton->domain = domain;
+	Handle<Value> Domain::GetVcpus(const Arguments& args) {
+		HandleScope scope;
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+		virDomainInfo info;
+		virNodeInfo nodeinfo;
+		virVcpuInfoPtr cpuinfo = NULL;
+		unsigned char *cpumap = NULL;
+		int ncpus;
+		int cpumaplen;
+		int ret = -1;
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            ResumeAsync,
-            (uv_after_work_cb)ResumeAsyncAfter
-        );
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        return Undefined();
-    }
+		ret = virDomainGetInfo(domain->domain_, &info);
 
-    Handle<Value> Domain::Shutdown(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        ret = virDomainShutdown(domain->domain_);
+		ret = virNodeGetInfo(virDomainGetConnect(domain->domain_), &nodeinfo);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        return True();
-    }
+		cpuinfo = (virVcpuInfoPtr) malloc(sizeof(*cpuinfo) * info.nrVirtCpu);
+		if(cpuinfo == NULL) {
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return Null();
+		}
+		memset(cpuinfo, 0, sizeof(*cpuinfo) * info.nrVirtCpu);
 
-    Handle<Value> Domain::Start(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		cpumaplen = VIR_CPU_MAPLEN(VIR_NODEINFO_MAXCPUS(nodeinfo));
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		cpumap = (unsigned char*)malloc(info.nrVirtCpu * cpumaplen);
+		if(cpumap == NULL) {
+			free(cpuinfo);
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return Null();
+		}
+		memset(cpumap, 0, info.nrVirtCpu * cpumaplen);
 
-        ret = virDomainCreate(domain->domain_);
+		ncpus = virDomainGetVcpus(domain->domain_, cpuinfo, info.nrVirtCpu, cpumap, cpumaplen);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-        return True();
-    }
+		if(ncpus < 0) {
+			free(cpuinfo);
+			free(cpumap);
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-    Handle<Value> Domain::SendKey(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		Local<Array> vcpus = Array::New(info.nrVirtCpu);
+		for(int i = 0; i < info.nrVirtCpu; i++) {
+			Local<Object> obj = Object::New();
+			obj->Set(number_symbol, Integer::New(cpuinfo[i].number));
+			obj->Set(state_symbol, Integer::New(cpuinfo[i].state));
+			obj->Set(cpu_time_symbol, Number::New(cpuinfo[i].cpuTime)); //nanoseconds
+			obj->Set(cpu_symbol, Integer::New(cpuinfo[i].cpu));
 
-        if(args.Length() == 0) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify arguments to invoke this function")));
-        }
+			int maxcpus =  VIR_NODEINFO_MAXCPUS(nodeinfo);
+			Local<Array> affinity = Array::New(maxcpus);
+			for(int j = 0; j < maxcpus; j++) {
+				Local<Object> cpu = Object::New();
+				cpu->Set(cpu_symbol, Integer::New(j));
+				cpu->Set(usable_symbol, Boolean::New(VIR_CPU_USABLE(cpumap, cpumaplen, i, j)));
 
-        if(!args[0]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("Argument must be an array of objects")));
-        }
+				affinity->Set(Integer::New(j), cpu);
+			}
+			obj->Set(affinity_symbol, affinity);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+			vcpus->Set(Integer::New(i), obj);
+		}
+		free(cpuinfo);
+		free(cpumap);
 
-        unsigned int keycodes[VIR_DOMAIN_SEND_KEY_MAX_KEYS];
+		return scope.Close(vcpus);
+	}
 
-        Local<Array> keycodes_ = Local<Array>::Cast(args[0]);
+	Handle<Value> Domain::SetVcpus(const Arguments& args) {
+		HandleScope scope;
+		unsigned int vcpus = 0;
+		int ret = -1;
 
-        unsigned int length = keycodes_->Length();
+		if(args.Length() == 0 || !args[0]->IsInt32()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a number")));
+		}
 
-        for(unsigned int i = 0; i < length; i++) {
-            keycodes[i] = (unsigned int) keycodes_->Get(Integer::New(i))->Int32Value();
-        }
+		vcpus = args[0]->Int32Value();
 
-        ret = virDomainSendKey(domain->domain_, 0, 150, keycodes, length, 0);
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-        return True();
-    }
+		ret = virDomainSetVcpus(domain->domain_, vcpus);
 
-    Handle<Value> Domain::GetVcpus(const Arguments& args) {
-        HandleScope scope;
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        virDomainInfo info;
-        virNodeInfo nodeinfo;
-        virVcpuInfoPtr cpuinfo = NULL;
-        unsigned char *cpumap = NULL;
-        int ncpus;
-        int cpumaplen;
-        int ret = -1;
+		return True();
+	}
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+	Handle<Value> Domain::Migrate(const Arguments& args) {
+		HandleScope scope;
+		unsigned long flags = 0;
+		unsigned long bandwidth = 0;
+		//        const char* dest_name = NULL;
+		int ret = -1;
 
-        ret = virDomainGetInfo(domain->domain_, &info);
+		if(args.Length() == 0) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify arguments to invoke this function")));
+		}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		if(!args[0]->IsObject()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify an object as first argument")));
+		}
 
-        ret = virNodeGetInfo(virDomainGetConnect(domain->domain_), &nodeinfo);
+		Local<Object> args_ = args[0]->ToObject();
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		if(!args_->Has(migration_uri_symbol)) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must have set property dest_uri in the object")));
+		}
 
-        cpuinfo = (virVcpuInfoPtr) malloc(sizeof(*cpuinfo) * info.nrVirtCpu);
-        if(cpuinfo == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
-        }
-        memset(cpuinfo, 0, sizeof(*cpuinfo) * info.nrVirtCpu);
+		//dest_uri
+		String::Utf8Value dest_uri(args_->Get(migration_uri_symbol));
 
-        cpumaplen = VIR_CPU_MAPLEN(VIR_NODEINFO_MAXCPUS(nodeinfo));
+		//dest_name
+		//if(args_->Has(migration_name_symbol)) {
+		String::Utf8Value dest_name(args_->Get(migration_name_symbol));
+		//dest_name = ToCString(dest_name_);
+		//}
 
-        cpumap = (unsigned char*)malloc(info.nrVirtCpu * cpumaplen);
-        if(cpumap == NULL) {
-            free(cpuinfo);
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
-        }
-        memset(cpumap, 0, info.nrVirtCpu * cpumaplen);
+		//flags
+		if(args_->Has(migration_flags_symbol)){
+			Local<Array> flags_ = Local<Array>::Cast(args_->Get(migration_flags_symbol));
+			unsigned int length = flags_->Length();
 
-        ncpus = virDomainGetVcpus(domain->domain_, cpuinfo, info.nrVirtCpu, cpumap, cpumaplen);
+			for (unsigned int i = 0; i < length; i++) {
+				flags |= flags_->Get(Integer::New(i))->Int32Value();
+			}
+		}
 
-        if(ncpus < 0) {
-            free(cpuinfo);
-            free(cpumap);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		//bandwidth (Mbps)
+		if(args_->Has(migration_bandwidth_symbol)) {
+			bandwidth = args_->Get(migration_bandwidth_symbol)->Int32Value();
+		}
 
-        Local<Array> vcpus = Array::New(info.nrVirtCpu);
-        for(int i = 0; i < info.nrVirtCpu; i++) {
-            Local<Object> obj = Object::New();
-            obj->Set(number_symbol, Integer::New(cpuinfo[i].number));
-            obj->Set(state_symbol, Integer::New(cpuinfo[i].state));
-            obj->Set(cpu_time_symbol, Number::New(cpuinfo[i].cpuTime)); //nanoseconds
-            obj->Set(cpu_symbol, Integer::New(cpuinfo[i].cpu));
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-            int maxcpus =  VIR_NODEINFO_MAXCPUS(nodeinfo);
-            Local<Array> affinity = Array::New(maxcpus);
-            for(int j = 0; j < maxcpus; j++) {
-                Local<Object> cpu = Object::New();
-                cpu->Set(cpu_symbol, Integer::New(j));
-                cpu->Set(usable_symbol, Boolean::New(VIR_CPU_USABLE(cpumap, cpumaplen, i, j)));
+		if(args_->Has(migration_hypervisor_symbol)) {
+			Local<Object> hyp_obj = args_->Get(migration_hypervisor_symbol)->ToObject();
 
-                affinity->Set(Integer::New(j), cpu);
-            }
-            obj->Set(affinity_symbol, affinity);
+			if(!Hypervisor::HasInstance(hyp_obj)) {
+				return ThrowException(Exception::TypeError(
+							String::New("You must specify a Hypervisor object instance")));
+			}
 
-            vcpus->Set(Integer::New(i), obj);
-        }
-        free(cpuinfo);
-        free(cpumap);
+			Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
-        return scope.Close(vcpus);
-    }
+			Domain *migrated_domain = new Domain();
+			migrated_domain->domain_ = virDomainMigrate(domain->domain_,
+					hypervisor->connection(),
+					flags,
+					(const char *) *dest_name,
+					(const char *) *dest_uri,
+					bandwidth);
 
-    Handle<Value> Domain::SetVcpus(const Arguments& args) {
-        HandleScope scope;
-        unsigned int vcpus = 0;
-        int ret = -1;
+			if(migrated_domain->domain_ == NULL) {
+				ThrowException(Error::New(virGetLastError()));
+				return False();
+			}
 
-        if(args.Length() == 0 || !args[0]->IsInt32()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a number")));
-        }
+			migrated_domain->Wrap(args.This());
 
-        vcpus = args[0]->Int32Value();
+			return scope.Close(migrated_domain->constructor_template->GetFunction()->NewInstance());
+		} else {
+			ret = virDomainMigrateToURI(domain->domain_,
+					(const char *) *dest_uri,
+					flags,
+					(const char *) *dest_name,
+					bandwidth);
+		}
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        ret = virDomainSetVcpus(domain->domain_, vcpus);
+		return True();
+	}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+	Handle<Value> Domain::SetMigrationMaxDowntime(const Arguments& args) {
+		HandleScope scope;
+		long long downtime = 0;
+		unsigned int flags = 0;
+		int ret = -1;
 
-        return True();
-    }
+		if(args.Length() == 0) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify arguments to invoke this function")));
+		}
 
-    Handle<Value> Domain::Migrate(const Arguments& args) {
-        HandleScope scope;
-        unsigned long flags = 0;
-        unsigned long bandwidth = 0;
-//        const char* dest_name = NULL;
-        int ret = -1;
+		if(!args[0]->IsInt32()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a number as first argument")));
+		}
 
-        if(args.Length() == 0) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify arguments to invoke this function")));
-        }
+		downtime = args[0]->Int32Value();
 
-        if(!args[0]->IsObject()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify an object as first argument")));
-        }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        Local<Object> args_ = args[0]->ToObject();
+		ret = virDomainMigrateSetMaxDowntime(domain->domain_, downtime, flags);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        if(!args_->Has(migration_uri_symbol)) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must have set property dest_uri in the object")));
-        }
+		return True();
+	}
 
-        //dest_uri
-        String::Utf8Value dest_uri(args_->Get(migration_uri_symbol));
+	Handle<Value> Domain::PinVcpu(const Arguments& args) {
+		HandleScope scope;
+		virNodeInfo nodeinfo;
+		unsigned char *cpumap = NULL;
+		int cpumaplen;
+		int vcpu;
+		int ret = -1;
 
-        //dest_name
-        //if(args_->Has(migration_name_symbol)) {
-            String::Utf8Value dest_name(args_->Get(migration_name_symbol));
-            //dest_name = ToCString(dest_name_);
-        //}
+		if(args.Length() < 2) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify two arguments")));
+		}
 
-        //flags
-        if(args_->Has(migration_flags_symbol)){
-            Local<Array> flags_ = Local<Array>::Cast(args_->Get(migration_flags_symbol));
-            unsigned int length = flags_->Length();
+		if(!args[0]->IsInt32()) {
+			return ThrowException(Exception::TypeError(
+						String::New("The first argument must be an integer")));
+		}
 
-            for (unsigned int i = 0; i < length; i++) {
-                flags |= flags_->Get(Integer::New(i))->Int32Value();
-            }
-        }
+		if(!args[1]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("The second argument must be an array of objects")));
+		}
 
-        //bandwidth (Mbps)
-        if(args_->Has(migration_bandwidth_symbol)) {
-            bandwidth = args_->Get(migration_bandwidth_symbol)->Int32Value();
-        }
+		vcpu = args[0]->Int32Value();
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(args_->Has(migration_hypervisor_symbol)) {
-            Local<Object> hyp_obj = args_->Get(migration_hypervisor_symbol)->ToObject();
+		ret = virNodeGetInfo(virDomainGetConnect(domain->domain_), &nodeinfo);
 
-            if(!Hypervisor::HasInstance(hyp_obj)) {
-                return ThrowException(Exception::TypeError(
-                String::New("You must specify a Hypervisor object instance")));
-            }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-            Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+		int maxcpus = VIR_NODEINFO_MAXCPUS(nodeinfo);
 
-            Domain *migrated_domain = new Domain();
-            migrated_domain->domain_ = virDomainMigrate(domain->domain_,
-                                                        hypervisor->connection(),
-                                                        flags,
-                                                        (const char *) *dest_name,
-                                                        (const char *) *dest_uri,
-                                                        bandwidth);
+		cpumaplen = VIR_CPU_MAPLEN(maxcpus);
+		cpumap = (unsigned char*)malloc(cpumaplen);
+		if(cpumap == NULL) {
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return False();
+		}
+		memset(cpumap, 0, cpumaplen);
 
-            if(migrated_domain->domain_ == NULL) {
-                ThrowException(Error::New(virGetLastError()));
-                return False();
-            }
+		Local<Array> cpus = Local<Array>::Cast(args[1]);
+		int ncpus = cpus->Length();
 
-            migrated_domain->Wrap(args.This());
+		for(int i = 0; i < ncpus; i++) {
+			if(i > maxcpus) {
+				break;
+			}
 
-            return scope.Close(migrated_domain->constructor_template->GetFunction()->NewInstance());
-        } else {
-            ret = virDomainMigrateToURI(domain->domain_,
-                                        (const char *) *dest_uri,
-                                        flags,
-                                        (const char *) *dest_name,
-                                        bandwidth);
-        }
+			if(!cpus->Get(Integer::New(i))->IsObject()) {
+				free(cpumap);
+				return ThrowException(Exception::TypeError(
+							String::New("The second argument must be an array of objects")));
+			}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+			Local<Object> cpu = cpus->Get(Integer::New(i))->ToObject();
+			bool usable = cpu->Get(usable_symbol)->IsTrue();
 
-        return True();
-    }
+			if(usable) {
+				VIR_USE_CPU(cpumap, cpu->Get(cpu_symbol)->Int32Value());
+			} else {
+				VIR_UNUSE_CPU(cpumap, cpu->Get(cpu_symbol)->Int32Value());
+			}
+		}
 
-    Handle<Value> Domain::SetMigrationMaxDowntime(const Arguments& args) {
-        HandleScope scope;
-        long long downtime = 0;
-        unsigned int flags = 0;
-        int ret = -1;
+		ret = virDomainPinVcpu(domain->domain_, vcpu, cpumap, cpumaplen);
+		free(cpumap);
 
-        if(args.Length() == 0) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify arguments to invoke this function")));
-        }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        if(!args[0]->IsInt32()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a number as first argument")));
-        }
+		return True();
+	}
 
-        downtime = args[0]->Int32Value();
+	void AttachDeviceAsync(uv_work_t* req) {
+		AttachDeviceBaton* baton = static_cast<AttachDeviceBaton*>(req->data);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		Domain *domain = baton->domain;
+		const char *xml = baton->xml;
+		unsigned int flags = baton->flags;
 
-        ret = virDomainMigrateSetMaxDowntime(domain->domain_, downtime, flags);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		virErrorPtr err;
+		int ret = -1;
 
-        return True();
-    }
+		if(flags > 0) {
+			ret = virDomainAttachDeviceFlags(domain->domain_, xml, flags);
+		} else {
+			ret = virDomainAttachDevice(domain->domain_, xml);
+		}
 
-    Handle<Value> Domain::PinVcpu(const Arguments& args) {
-        HandleScope scope;
-        virNodeInfo nodeinfo;
-        unsigned char *cpumap = NULL;
-        int cpumaplen;
-        int vcpu;
-        int ret = -1;
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+	}
 
-        if(args.Length() < 2) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify two arguments")));
-        }
+	void AttachDeviceAsyncAfter(uv_work_t* req) {
+		AttachDeviceBaton* baton = static_cast<AttachDeviceBaton*>(req->data);
+		delete req;
 
-        if(!args[0]->IsInt32()) {
-            return ThrowException(Exception::TypeError(
-            String::New("The first argument must be an integer")));
-        }
+		Handle<Value> argv[2];
 
-        if(!args[1]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("The second argument must be an array of objects")));
-        }
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        vcpu = args[0]->Int32Value();
+		else {
+			argv[0] = Undefined();
+			argv[1] = True();
+		}
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		TryCatch try_catch;
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        ret = virNodeGetInfo(virDomainGetConnect(domain->domain_), &nodeinfo);
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+	Handle<Value> Domain::AttachDevice(const Arguments& args) {
+		HandleScope scope;
 
-        int maxcpus = VIR_NODEINFO_MAXCPUS(nodeinfo);
+		unsigned int flags = 0;
+		int argsl = args.Length();
 
-        cpumaplen = VIR_CPU_MAPLEN(maxcpus);
-        cpumap = (unsigned char*)malloc(cpumaplen);
-        if(cpumap == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return False();
-        }
-        memset(cpumap, 0, cpumaplen);
+		if(argsl < 1 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("First argument must be string of device XML")));
+		}
 
-        Local<Array> cpus = Local<Array>::Cast(args[1]);
-        int ncpus = cpus->Length();
+		// XML
+		const char *xml = parseString(args[0]);
 
-        for(int i = 0; i < ncpus; i++) {
-            if(i > maxcpus) {
-                break;
-            }
+		if(argsl < 2 || !args[1]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("Second argument must be array of flags")));
+		}
 
-            if(!cpus->Get(Integer::New(i))->IsObject()) {
-                free(cpumap);
-                return ThrowException(Exception::TypeError(
-                String::New("The second argument must be an array of objects")));
-            }
+		// Parse flags
+		Local<Array> flags_ = Local<Array>::Cast(args[1]);
+		unsigned int length = flags_->Length();
 
-            Local<Object> cpu = cpus->Get(Integer::New(i))->ToObject();
-            bool usable = cpu->Get(usable_symbol)->IsTrue();
+		for (unsigned int i = 0; i < length; i++) {
+			flags |= flags_->Get(Integer::New(i))->Int32Value();
+		}
 
-            if(usable) {
-                VIR_USE_CPU(cpumap, cpu->Get(cpu_symbol)->Int32Value());
-            } else {
-                VIR_UNUSE_CPU(cpumap, cpu->Get(cpu_symbol)->Int32Value());
-            }
-        }
+		if(argsl < 3 || !args[2]->IsFunction()) {
+			return ThrowException(Exception::TypeError(
+						String::New("Third argument must be a callback function")));
+		}
 
-        ret = virDomainPinVcpu(domain->domain_, vcpu, cpumap, cpumaplen);
-        free(cpumap);
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[3]);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        return True();
-    }
+		// Create baton
+		AttachDeviceBaton* baton = new AttachDeviceBaton();
 
-    void AttachDeviceAsync(uv_work_t* req) {
-        AttachDeviceBaton* baton = static_cast<AttachDeviceBaton*>(req->data);
+		// Add data to baton
+		baton->callback = Persistent<Function>::New(callback);
+		baton->domain = domain;
+		baton->flags = flags;
+		baton->xml = xml;
 
-        Domain *domain = baton->domain;
-        const char *xml = baton->xml;
-        unsigned int flags = baton->flags;
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        virErrorPtr err;
-        int ret = -1;
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				AttachDeviceAsync,
+				(uv_after_work_cb)AttachDeviceAsyncAfter
+				);
 
-        if(flags > 0) {
-            ret = virDomainAttachDeviceFlags(domain->domain_, xml, flags);
-        } else {
-            ret = virDomainAttachDevice(domain->domain_, xml);
-        }
+		return Undefined();
+	}
 
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-    }
+	void DetachDeviceAsync(uv_work_t* req) {
+		DetachDeviceBaton* baton = static_cast<DetachDeviceBaton*>(req->data);
 
-    void AttachDeviceAsyncAfter(uv_work_t* req) {
-        AttachDeviceBaton* baton = static_cast<AttachDeviceBaton*>(req->data);
-        delete req;
+		Domain *domain = baton->domain;
+		const char *xml = baton->xml;
+		unsigned int flags = baton->flags;
 
-        Handle<Value> argv[2];
+		virErrorPtr err;
+		int ret = -1;
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		if(flags > 0) {
+			ret = virDomainDetachDeviceFlags(domain->domain_, xml, flags);
+		} else {
+			ret = virDomainDetachDevice(domain->domain_, xml);
+		}
 
-        else {
-            argv[0] = Undefined();
-            argv[1] = True();
-        }
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+	}
 
-        TryCatch try_catch;
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
+	void DetachDeviceAsyncAfter(uv_work_t* req) {
+		DetachDeviceBaton* baton = static_cast<DetachDeviceBaton*>(req->data);
+		delete req;
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		Handle<Value> argv[2];
 
-    Handle<Value> Domain::AttachDevice(const Arguments& args) {
-        HandleScope scope;
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        unsigned int flags = 0;
-        int argsl = args.Length();
+		else {
+			argv[0] = Undefined();
+			argv[1] = True();
+		}
 
-        if(argsl < 1 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("First argument must be string of device XML")));
-        }
+		TryCatch try_catch;
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        // XML
-        const char *xml = parseString(args[0]);
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        if(argsl < 2 || !args[1]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("Second argument must be array of flags")));
-        }
+	Handle<Value> Domain::DetachDevice(const Arguments& args) {
+		HandleScope scope;
 
-        // Parse flags
-        Local<Array> flags_ = Local<Array>::Cast(args[1]);
-        unsigned int length = flags_->Length();
+		unsigned int flags = 0;
+		int argsl = args.Length();
 
-        for (unsigned int i = 0; i < length; i++) {
-            flags |= flags_->Get(Integer::New(i))->Int32Value();
-        }
+		if(argsl < 1 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("First argument must be string of device XML")));
+		}
 
-        if(argsl < 3 || !args[2]->IsFunction()) {
-            return ThrowException(Exception::TypeError(
-            String::New("Third argument must be a callback function")));
-        }
+		// XML
+		const char *xml = parseString(args[0]);
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[3]);
+		if(argsl < 2 || !args[1]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("Second argument must be array of flags")));
+		}
 
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		// Parse flags
+		Local<Array> flags_ = Local<Array>::Cast(args[1]);
+		unsigned int length = flags_->Length();
 
-        // Create baton
-        AttachDeviceBaton* baton = new AttachDeviceBaton();
+		for (unsigned int i = 0; i < length; i++) {
+			flags |= flags_->Get(Integer::New(i))->Int32Value();
+		}
 
-        // Add data to baton
-        baton->callback = Persistent<Function>::New(callback);
-        baton->domain = domain;
-        baton->flags = flags;
-        baton->xml = xml;
+		if(argsl < 3 || !args[2]->IsFunction()) {
+			return ThrowException(Exception::TypeError(
+						String::New("Third argument must be a callback function")));
+		}
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[3]);
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            AttachDeviceAsync,
-            (uv_after_work_cb)AttachDeviceAsyncAfter
-        );
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        return Undefined();
-    }
+		// Create baton
+		DetachDeviceBaton* baton = new DetachDeviceBaton();
 
-    void DetachDeviceAsync(uv_work_t* req) {
-        DetachDeviceBaton* baton = static_cast<DetachDeviceBaton*>(req->data);
+		// Add data to baton
+		baton->callback = Persistent<Function>::New(callback);
+		baton->domain = domain;
+		baton->flags = flags;
+		baton->xml = xml;
 
-        Domain *domain = baton->domain;
-        const char *xml = baton->xml;
-        unsigned int flags = baton->flags;
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        virErrorPtr err;
-        int ret = -1;
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				DetachDeviceAsync,
+				(uv_after_work_cb)DetachDeviceAsyncAfter
+				);
 
-        if(flags > 0) {
-            ret = virDomainAttachDeviceFlags(domain->domain_, xml, flags);
-        } else {
-            ret = virDomainAttachDevice(domain->domain_, xml);
-        }
+		return Undefined();
+	}
 
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-    }
+	Handle<Value> Domain::UpdateDevice(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		int ret = -1;
 
-    void DetachDeviceAsyncAfter(uv_work_t* req) {
-        DetachDeviceBaton* baton = static_cast<DetachDeviceBaton*>(req->data);
-        delete req;
+		if(args.Length() < 2) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify two arguments to invoke this function")));
+		}
 
-        Handle<Value> argv[2];
+		if(!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as first argument")));
+		}
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		if(!args[1]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify an array as second argument")));
+		}
 
-        else {
-            argv[0] = Undefined();
-            argv[1] = True();
-        }
+		String::Utf8Value xml(args[0]->ToString());
 
-        TryCatch try_catch;
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
+		//flags
+		Local<Array> flags_ = Local<Array>::Cast(args[1]);
+		unsigned int length = flags_->Length();
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		for (unsigned int i = 0; i < length; i++) {
+			flags |= flags_->Get(Integer::New(i))->Int32Value();
+		}
 
-    Handle<Value> Domain::DetachDevice(const Arguments& args) {
-        HandleScope scope;
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        unsigned int flags = 0;
-        int argsl = args.Length();
+		ret = virDomainUpdateDeviceFlags(domain->domain_, (const char *) *xml, flags);
 
-        if(argsl < 1 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("First argument must be string of device XML")));
-        }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        // XML
-        const char *xml = parseString(args[0]);
+		return True();
+	}
 
-        if(argsl < 2 || !args[1]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("Second argument must be array of flags")));
-        }
+	void DestroyAsync(uv_work_t* req) {
+		DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
 
-        // Parse flags
-        Local<Array> flags_ = Local<Array>::Cast(args[1]);
-        unsigned int length = flags_->Length();
+		Domain *domain = baton->domain;
+		virErrorPtr err;
 
-        for (unsigned int i = 0; i < length; i++) {
-            flags |= flags_->Get(Integer::New(i))->Int32Value();
-        }
+		int ret = -1;
+		ret = virDomainDestroy(domain->domain_);
 
-        if(argsl < 3 || !args[2]->IsFunction()) {
-            return ThrowException(Exception::TypeError(
-            String::New("Third argument must be a callback function")));
-        }
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+		baton->res = ret;
+	}
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[3]);
+	void DestroyAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
 
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
+		delete req;
 
-        // Create baton
-        DetachDeviceBaton* baton = new DetachDeviceBaton();
+		Handle<Value> argv[2];
 
-        // Add data to baton
-        baton->callback = Persistent<Function>::New(callback);
-        baton->domain = domain;
-        baton->flags = flags;
-        baton->xml = xml;
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+		else {
+			argv[0] = Undefined();
+			argv[1] = scope.Close(True());
+		}
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            DetachDeviceAsync,
-            (uv_after_work_cb)DetachDeviceAsyncAfter
-        );
+		TryCatch try_catch;
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        return Undefined();
-    }
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-    Handle<Value> Domain::UpdateDevice(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
+	Handle<Value> Domain::Destroy(const Arguments& args) {
+		HandleScope scope;
 
-        if(args.Length() < 2) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify two arguments to invoke this function")));
-        }
+		// Domain handle
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(!args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as first argument")));
-        }
+		// Create baton
+		DestroyBaton* baton = new DestroyBaton();
 
-        if(!args[1]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify an array as second argument")));
-        }
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[0]);
+		baton->callback = Persistent<Function>::New(callback);
 
-        String::Utf8Value xml(args[0]->ToString());
+		// Add data
+		baton->domain = domain;
 
-        //flags
-        Local<Array> flags_ = Local<Array>::Cast(args[1]);
-        unsigned int length = flags_->Length();
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        for (unsigned int i = 0; i < length; i++) {
-            flags |= flags_->Get(Integer::New(i))->Int32Value();
-        }
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				DestroyAsync,
+				(uv_after_work_cb)DestroyAsyncAfter
+				);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		return scope.Close(Undefined());
+	}
 
-        ret = virDomainUpdateDeviceFlags(domain->domain_, (const char *) *xml, flags);
+	void ToXmlAsync(uv_work_t* req) {
+		ToXmlBaton* baton = static_cast<ToXmlBaton*>(req->data);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		Domain *domain = baton->domain;
+		unsigned int flags = baton->flags;
 
-        return True();
-    }
+		virErrorPtr err;
+		char* xml_ = NULL;
 
-    void DestroyAsync(uv_work_t* req) {
-        DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
+		xml_ = virDomainGetXMLDesc(domain->domain_, flags);
 
-        Domain *domain = baton->domain;
-        virErrorPtr err;
+		if(xml_ == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
 
-        int ret = -1;
-        ret = virDomainDestroy(domain->domain_);
+		else {
+			//Local<String> xml = String::New(xml_);
+			baton->xml = xml_;
+		}
+		//free(xml_);
+		//return scope.Close(xml);
+	}
 
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-        baton->res = ret;
-    }
+	void ToXmlAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
 
-    void DestroyAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
+		ToXmlBaton* baton = static_cast<ToXmlBaton*>(req->data);
+		delete req;
 
-        DestroyBaton* baton = static_cast<DestroyBaton*>(req->data);
-        delete req;
+		Handle<Value> argv[2];
 
-        Handle<Value> argv[2];
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		else {
+			argv[0] = Undefined();
+			argv[1] = String::New(baton->xml);
+		}
 
-        else {
-            argv[0] = Undefined();
-            argv[1] = scope.Close(True());
-        }
+		TryCatch try_catch;
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
 
-        TryCatch try_catch;
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
+	Handle<Value> Domain::ToXml(const Arguments& args) {
+		HandleScope scope;
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		// Flags
+		int flags = 0;
+		if(args.Length() == 0 || !args[0]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("First argument must be an array of flags")));
+		}
+		Local<Array> flags_ = Local<Array>::Cast(args[0]);
+		unsigned int length = flags_->Length();
 
-    Handle<Value> Domain::Destroy(const Arguments& args) {
-        HandleScope scope;
+		for (unsigned int i = 0; i < length; i++) {
+			flags |= flags_->Get(Integer::New(i))->Int32Value();
+		}
 
-        // Domain handle
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		if(args.Length() == 1 || !args[1]->IsFunction()) {
+			return ThrowException(Exception::TypeError(
+						String::New("Second argument must be a callback function")));
+		}
 
-        // Create baton
-        DestroyBaton* baton = new DestroyBaton();
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[0]);
-        baton->callback = Persistent<Function>::New(callback);
+		// Create baton
+		ToXmlBaton* baton = new ToXmlBaton();
 
-        // Add data
-        baton->domain = domain;
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[1]);
+		baton->callback = Persistent<Function>::New(callback);
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+		// Add data to baton
+		baton->domain = domain;
+		baton->flags = flags;
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            DestroyAsync,
-            (uv_after_work_cb)DestroyAsyncAfter
-        );
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
 
-        return scope.Close(Undefined());
-    }
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				ToXmlAsync,
+				(uv_after_work_cb)ToXmlAsyncAfter
+				);
 
-    void ToXmlAsync(uv_work_t* req) {
-        ToXmlBaton* baton = static_cast<ToXmlBaton*>(req->data);
+		return Undefined();
+	}
 
-        Domain *domain = baton->domain;
-        unsigned int flags = baton->flags;
+	Handle<Value> Domain::GetJobInfo(const Arguments& args) {
+		HandleScope scope;
+		virDomainJobInfo info_;
+		int ret = -1;
 
-        virErrorPtr err;
-        char* xml_ = NULL;
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        xml_ = virDomainGetXMLDesc(domain->domain_, flags);
+		ret = virDomainGetJobInfo(domain->domain_, &info_);
 
-        if(xml_ == NULL) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        else {
-            //Local<String> xml = String::New(xml_);
-            baton->xml = xml_;
-        }
-        //free(xml_);
-        //return scope.Close(xml);
-    }
+		Local<Object> info = Object::New();
+		info->Set(type_symbol, Integer::New(info_.type));
 
-    void ToXmlAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
+		//time
+		Local<Object> time = Object::New();
+		time->Set(elapsed_symbol, Number::New(info_.timeElapsed));
+		time->Set(remaining_symbol, Number::New(info_.timeRemaining));
 
-        ToXmlBaton* baton = static_cast<ToXmlBaton*>(req->data);
-        delete req;
+		//data
+		Local<Object> data = Object::New();
+		data->Set(total_symbol, Number::New(info_.dataTotal));
+		data->Set(processed_symbol, Number::New(info_.dataProcessed));
+		data->Set(remaining_symbol, Number::New(info_.dataRemaining));
 
-        Handle<Value> argv[2];
+		//memory
+		Local<Object> memory = Object::New();
+		memory->Set(total_symbol, Number::New(info_.memTotal));
+		memory->Set(processed_symbol, Number::New(info_.memProcessed));
+		memory->Set(remaining_symbol, Number::New(info_.memRemaining));
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		//file
+		Local<Object> file = Object::New();
+		file->Set(total_symbol, Number::New(info_.fileTotal));
+		file->Set(processed_symbol, Number::New(info_.fileProcessed));
+		file->Set(remaining_symbol, Number::New(info_.fileRemaining));
 
-        else {
-            argv[0] = Undefined();
-            argv[1] = String::New(baton->xml);
-        }
+		info->Set(time_symbol, time);
+		info->Set(data_symbol, data);
+		info->Set(memory_symbol, memory);
+		info->Set(file_symbol, file);
 
-        TryCatch try_catch;
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
+		return scope.Close(info);
+	}
 
-    Handle<Value> Domain::ToXml(const Arguments& args) {
-        HandleScope scope;
+	Handle<Value> Domain::AbortCurrentJob(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
 
-        // Flags
-        int flags = 0;
-        if(args.Length() == 0 || !args[0]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("First argument must be an array of flags")));
-        }
-        Local<Array> flags_ = Local<Array>::Cast(args[0]);
-        unsigned int length = flags_->Length();
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		ret = virDomainAbortJob(domain->domain_);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        for (unsigned int i = 0; i < length; i++) {
-            flags |= flags_->Get(Integer::New(i))->Int32Value();
-        }
+		return True();
+	}
 
-        if(args.Length() == 1 || !args[1]->IsFunction()) {
-            return ThrowException(Exception::TypeError(
-            String::New("Second argument must be a callback function")));
-        }
+	Handle<Value> Domain::GetSchedType(const Arguments& args) {
+		HandleScope scope;
+		return Undefined();
+	}
 
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+	Handle<Value> Domain::GetSchedParams(const Arguments& args) {
+		HandleScope scope;
+		int nparams = 0;
+		int ret = -1;
+		char *type = NULL;
+		virSchedParameterPtr params_;
 
-        // Create baton
-        ToXmlBaton* baton = new ToXmlBaton();
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		type = virDomainGetSchedulerType(domain->domain_, &nparams);
 
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[1]);
-        baton->callback = Persistent<Function>::New(callback);
+		if(type == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+		free(type);
 
-        // Add data to baton
-        baton->domain = domain;
-        baton->flags = flags;
+		params_ = (virSchedParameterPtr) malloc(sizeof(*params_) * nparams);
 
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
+		if(params_ == NULL) {
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return Null();
+		}
+		memset(params_, 0, sizeof(*params_) * nparams);
 
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            ToXmlAsync,
-            (uv_after_work_cb)ToXmlAsyncAfter
-        );
+		ret = virDomainGetSchedulerParameters(domain->domain_, params_, &nparams);
 
-        return Undefined();
-    }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			free(params_);
+			return Null();
+		}
 
-    Handle<Value> Domain::GetJobInfo(const Arguments& args) {
-        HandleScope scope;
-        virDomainJobInfo info_;
-        int ret = -1;
+		Local<Object> params = Object::New();
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		for(int i = 0; i < nparams; i++) {
+			Local<Value> value = Local<Value>::New(Null());
 
-        ret = virDomainGetJobInfo(domain->domain_, &info_);
+			switch(params_[i].type) {
+				case VIR_DOMAIN_SCHED_FIELD_INT:
+					value = Integer::New(params_[i].value.i);
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_UINT:
+					value = Integer::New(params_[i].value.ui);
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_LLONG:
+					value = Number::New(params_[i].value.l);
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_ULLONG:
+					value = Number::New(params_[i].value.ul);
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_DOUBLE:
+					value = Number::New(params_[i].value.d);
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_BOOLEAN:
+					value = Integer::New(params_[i].value.b);
+					break;
+			}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+			params->Set(String::New(params_[i].field), value);
+		}
+		free(params_);
 
-        Local<Object> info = Object::New();
-        info->Set(type_symbol, Integer::New(info_.type));
+		return scope.Close(params);
+	}
 
-        //time
-        Local<Object> time = Object::New();
-        time->Set(elapsed_symbol, Number::New(info_.timeElapsed));
-        time->Set(remaining_symbol, Number::New(info_.timeRemaining));
+	Handle<Value> Domain::SetSchedParams(const Arguments& args) {
+		HandleScope scope;
+		virSchedParameterPtr params = NULL;
+		int nparams = 0;
+		char *type = NULL;
+		int ret = -1;
 
-        //data
-        Local<Object> data = Object::New();
-        data->Set(total_symbol, Number::New(info_.dataTotal));
-        data->Set(processed_symbol, Number::New(info_.dataProcessed));
-        data->Set(remaining_symbol, Number::New(info_.dataRemaining));
+		if(args.Length() == 0 || !args[0]->IsObject()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify an object as argument to invoke this function")));
+		}
 
-        //memory
-        Local<Object> memory = Object::New();
-        memory->Set(total_symbol, Number::New(info_.memTotal));
-        memory->Set(processed_symbol, Number::New(info_.memProcessed));
-        memory->Set(remaining_symbol, Number::New(info_.memRemaining));
+		Local<Object> newparams = args[0]->ToObject();
 
-        //file
-        Local<Object> file = Object::New();
-        file->Set(total_symbol, Number::New(info_.fileTotal));
-        file->Set(processed_symbol, Number::New(info_.fileProcessed));
-        file->Set(remaining_symbol, Number::New(info_.fileRemaining));
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		type = virDomainGetSchedulerType(domain->domain_, &nparams);
 
-        info->Set(time_symbol, time);
-        info->Set(data_symbol, data);
-        info->Set(memory_symbol, memory);
-        info->Set(file_symbol, file);
+		if(type == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
+		free(type);
 
-        return scope.Close(info);
-    }
+		params = (virSchedParameterPtr) malloc(sizeof(*params) * nparams);
+		if(params == NULL) {
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return False();
+		}
 
-    Handle<Value> Domain::AbortCurrentJob(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+		memset(params, 0, sizeof(*params) * nparams);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        ret = virDomainAbortJob(domain->domain_);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+		ret = virDomainGetSchedulerParameters(domain->domain_, params, &nparams);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			free(params);
+			return False();
+		}
 
-        return True();
-    }
+		for(int i = 0; i < nparams; i++) {
+			Local<String> field = String::New(params[i].field);
+			if(!newparams->Has(field)) {
+				continue;
+			}
 
-    Handle<Value> Domain::GetSchedType(const Arguments& args) {
-        HandleScope scope;
-        return Undefined();
-    }
+			Local<Value> value = newparams->Get(field);
 
-    Handle<Value> Domain::GetSchedParams(const Arguments& args) {
-        HandleScope scope;
-        int nparams = 0;
-        int ret = -1;
-        char *type = NULL;
-        virSchedParameterPtr params_;
+			switch (params[i].type) {
+				case VIR_DOMAIN_SCHED_FIELD_INT:
+					params[i].value.i = value->Int32Value();
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_UINT:
+					params[i].value.ui = value->Uint32Value();
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_LLONG:
+					params[i].value.l = value->NumberValue();
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_ULLONG:
+					params[i].value.ul = value->NumberValue();
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_DOUBLE:
+					params[i].value.d = value->NumberValue();
+					break;
+				case VIR_DOMAIN_SCHED_FIELD_BOOLEAN:
+					params[i].value.b = value->Uint32Value();
+					break;
+			}
+		}
+		ret = virDomainSetSchedulerParameters(domain->domain_, params, nparams);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        type = virDomainGetSchedulerType(domain->domain_, &nparams);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			free(params);
+			return False();
+		}
+		free(params);
 
-        if(type == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        free(type);
+		return True();
+	}
 
-        params_ = (virSchedParameterPtr) malloc(sizeof(*params_) * nparams);
+	Handle<Value> Domain::GetSecurityLabel(const Arguments& args) {
+		HandleScope scope;
+		virSecurityLabel label_;
+		int ret = -1;
 
-        if(params_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
-        }
-        memset(params_, 0, sizeof(*params_) * nparams);
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        ret = virDomainGetSchedulerParameters(domain->domain_, params_, &nparams);
+		memset(&label_, 0, sizeof label_);
+		ret = virDomainGetSecurityLabel(domain->domain_, &label_);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            free(params_);
-            return Null();
-        }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        Local<Object> params = Object::New();
+		Local<Object> label = Object::New();
+		label->Set(label_symbol, String::New(label_.label));
+		label->Set(enforcing_symbol, Boolean::New(label_.enforcing));
 
-        for(int i = 0; i < nparams; i++) {
-            Local<Value> value = Local<Value>::New(Null());
+		return scope.Close(label);
+	}
 
-            switch(params_[i].type) {
-                case VIR_DOMAIN_SCHED_FIELD_INT:
-                    value = Integer::New(params_[i].value.i);
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_UINT:
-                    value = Integer::New(params_[i].value.ui);
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_LLONG:
-                    value = Number::New(params_[i].value.l);
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_ULLONG:
-                    value = Number::New(params_[i].value.ul);
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_DOUBLE:
-                    value = Number::New(params_[i].value.d);
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_BOOLEAN:
-                    value = Integer::New(params_[i].value.b);
-                    break;
-            }
+	Handle<Value> Domain::SaveManagedImage(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		int ret = -1;
 
-            params->Set(String::New(params_[i].field), value);
-        }
-        free(params_);
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        return scope.Close(params);
-    }
+		ret = virDomainManagedSave(domain->domain_, flags);
 
-    Handle<Value> Domain::SetSchedParams(const Arguments& args) {
-        HandleScope scope;
-        virSchedParameterPtr params = NULL;
-        int nparams = 0;
-        char *type = NULL;
-        int ret = -1;
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        if(args.Length() == 0 || !args[0]->IsObject()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify an object as argument to invoke this function")));
-        }
+		return True();
+	}
 
-        Local<Object> newparams = args[0]->ToObject();
+	Handle<Value> Domain::RemoveManagedImage(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		int ret = -1;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        type = virDomainGetSchedulerType(domain->domain_, &nparams);
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(type == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-        free(type);
+		ret = virDomainManagedSaveRemove(domain->domain_, flags);
 
-        params = (virSchedParameterPtr) malloc(sizeof(*params) * nparams);
-        if(params == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return False();
-        }
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        memset(params, 0, sizeof(*params) * nparams);
+		return True();
+	}
 
-        ret = virDomainGetSchedulerParameters(domain->domain_, params, &nparams);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            free(params);
-            return False();
-        }
+	Handle<Value> Domain::HasManagedImage(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		int ret = -1;
 
-        for(int i = 0; i < nparams; i++) {
-            Local<String> field = String::New(params[i].field);
-            if(!newparams->Has(field)) {
-                continue;
-            }
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-            Local<Value> value = newparams->Get(field);
+		ret = virDomainHasManagedSaveImage(domain->domain_, flags);
 
-            switch (params[i].type) {
-                case VIR_DOMAIN_SCHED_FIELD_INT:
-                    params[i].value.i = value->Int32Value();
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_UINT:
-                    params[i].value.ui = value->Uint32Value();
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_LLONG:
-                    params[i].value.l = value->NumberValue();
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_ULLONG:
-                    params[i].value.ul = value->NumberValue();
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_DOUBLE:
-                    params[i].value.d = value->NumberValue();
-                    break;
-                case VIR_DOMAIN_SCHED_FIELD_BOOLEAN:
-                    params[i].value.b = value->Uint32Value();
-                    break;
-            }
-        }
-        ret = virDomainSetSchedulerParameters(domain->domain_, params, nparams);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            free(params);
-            return False();
-        }
-        free(params);
+		return scope.Close(Boolean::New(ret));
+	}
 
-        return True();
-    }
-
-    Handle<Value> Domain::GetSecurityLabel(const Arguments& args) {
-        HandleScope scope;
-        virSecurityLabel label_;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        memset(&label_, 0, sizeof label_);
-        ret = virDomainGetSecurityLabel(domain->domain_, &label_);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        Local<Object> label = Object::New();
-        label->Set(label_symbol, String::New(label_.label));
-        label->Set(enforcing_symbol, Boolean::New(label_.enforcing));
-
-        return scope.Close(label);
-    }
-
-    Handle<Value> Domain::SaveManagedImage(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainManagedSave(domain->domain_, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return True();
-    }
-
-    Handle<Value> Domain::RemoveManagedImage(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainManagedSaveRemove(domain->domain_, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return True();
-    }
-
-    Handle<Value> Domain::HasManagedImage(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainHasManagedSaveImage(domain->domain_, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return scope.Close(Boolean::New(ret));
-    }
-
-    Handle<Value> Domain::MemoryPeek(const Arguments& args) {
-        HandleScope scope;
-        unsigned long long start = 0;
+	Handle<Value> Domain::MemoryPeek(const Arguments& args) {
+		HandleScope scope;
+		unsigned long long start = 0;
 		size_t size = 0;
 		char * buffer_ = NULL;
 		unsigned int flags = 0;
 
-        if(args.Length() < 3) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify three arguments to invoke this function")));
-        }
+		if(args.Length() < 3) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify three arguments to invoke this function")));
+		}
 
-        if(!args[0]->IsNumber() || !args[1]->IsNumber()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a number in the first and second argument")));
-        }
+		if(!args[0]->IsNumber() || !args[1]->IsNumber()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a number in the first and second argument")));
+		}
 
-        if(!args[2]->IsArray()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify an array in the third argument")));
-        }
+		if(!args[2]->IsArray()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify an array in the third argument")));
+		}
 
-        start = args[0]->NumberValue();
-        size = args[1]->NumberValue() * sizeof(char *);
+		start = args[0]->NumberValue();
+		size = args[1]->NumberValue() * sizeof(char *);
 
-        //flags
-        Local<Array> flags_ = Local<Array>::Cast(args[2]);
-        unsigned int length = flags_->Length();
+		//flags
+		Local<Array> flags_ = Local<Array>::Cast(args[2]);
+		unsigned int length = flags_->Length();
 
-        for (unsigned int i = 0; i < length; i++) {
-            flags |= flags_->Get(Integer::New(i))->Int32Value();
-        }
+		for (unsigned int i = 0; i < length; i++) {
+			flags |= flags_->Get(Integer::New(i))->Int32Value();
+		}
 
-        buffer_ = (char*) malloc(size);
+		buffer_ = (char*) malloc(size);
 
-        if(buffer_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
-        }
+		if(buffer_ == NULL) {
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return Null();
+		}
 
-        memset(buffer_, 0, size);
+		memset(buffer_, 0, size);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        int ret = virDomainMemoryPeek(domain->domain_, start, size, buffer_, flags);
+		int ret = virDomainMemoryPeek(domain->domain_, start, size, buffer_, flags);
 
-        if(ret == -1) {
-            free(buffer_);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		if(ret == -1) {
+			free(buffer_);
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        Buffer *buffer = Buffer::New(size);
-        memcpy(Buffer::Data(buffer), buffer_, size);
-        free(buffer_);
+		Buffer *buffer = Buffer::New(size);
+		memcpy(Buffer::Data(buffer), buffer_, size);
+		free(buffer_);
 
-        return scope.Close(buffer->handle_);
-    }
+		return scope.Close(buffer->handle_);
+	}
 
-    Handle<Value> Domain::GetMemoryStats(const Arguments& args) {
-        HandleScope scope;
-        unsigned int nr_stats = 0;
-        unsigned int flags = 0;
-        virDomainMemoryStatStruct stats_[VIR_DOMAIN_MEMORY_STAT_NR];
+	Handle<Value> Domain::GetMemoryStats(const Arguments& args) {
+		HandleScope scope;
+		unsigned int nr_stats = 0;
+		unsigned int flags = 0;
+		virDomainMemoryStatStruct stats_[VIR_DOMAIN_MEMORY_STAT_NR];
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        nr_stats = virDomainMemoryStats(domain->domain_, stats_,
-                                    VIR_DOMAIN_MEMORY_STAT_NR, flags);
+		nr_stats = virDomainMemoryStats(domain->domain_, stats_,
+				VIR_DOMAIN_MEMORY_STAT_NR, flags);
 
-        if(nr_stats == -1u) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		if(nr_stats == -1u) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        Local<Object> stats = Object::New();
+		Local<Object> stats = Object::New();
 
-        for(unsigned int i = 0; i < nr_stats; i++) {
-            switch (stats_[i].tag) {
-                case VIR_DOMAIN_MEMORY_STAT_SWAP_IN:
-                    stats->Set(memory_stat_swap_in_symbol, Number::New(stats_[i].val));
-                    break;
-                case VIR_DOMAIN_MEMORY_STAT_SWAP_OUT:
-                    stats->Set(memory_stat_swap_out_symbol, Number::New(stats_[i].val));
-                    break;
-                case VIR_DOMAIN_MEMORY_STAT_MAJOR_FAULT:
-                    stats->Set(memory_stat_major_fault_symbol, Number::New(stats_[i].val));
-                    break;
-                case VIR_DOMAIN_MEMORY_STAT_MINOR_FAULT:
-                    stats->Set(memory_stat_minor_fault_symbol, Number::New(stats_[i].val));
-                    break;
-                case VIR_DOMAIN_MEMORY_STAT_UNUSED:
-                    stats->Set(memory_stat_unused_symbol, Number::New(stats_[i].val));
-                    break;
-                case VIR_DOMAIN_MEMORY_STAT_AVAILABLE:
-                    stats->Set(memory_stat_available_symbol, Number::New(stats_[i].val));
-                    break;
-            }
-        }
-        return scope.Close(stats);
-    }
+		for(unsigned int i = 0; i < nr_stats; i++) {
+			switch (stats_[i].tag) {
+				case VIR_DOMAIN_MEMORY_STAT_SWAP_IN:
+					stats->Set(memory_stat_swap_in_symbol, Number::New(stats_[i].val));
+					break;
+				case VIR_DOMAIN_MEMORY_STAT_SWAP_OUT:
+					stats->Set(memory_stat_swap_out_symbol, Number::New(stats_[i].val));
+					break;
+				case VIR_DOMAIN_MEMORY_STAT_MAJOR_FAULT:
+					stats->Set(memory_stat_major_fault_symbol, Number::New(stats_[i].val));
+					break;
+				case VIR_DOMAIN_MEMORY_STAT_MINOR_FAULT:
+					stats->Set(memory_stat_minor_fault_symbol, Number::New(stats_[i].val));
+					break;
+				case VIR_DOMAIN_MEMORY_STAT_UNUSED:
+					stats->Set(memory_stat_unused_symbol, Number::New(stats_[i].val));
+					break;
+				case VIR_DOMAIN_MEMORY_STAT_AVAILABLE:
+					stats->Set(memory_stat_available_symbol, Number::New(stats_[i].val));
+					break;
+			}
+		}
+		return scope.Close(stats);
+	}
 
-    Handle<Value> Domain::BlockPeek(const Arguments& args) {
-        HandleScope scope;
-        unsigned long long start = 0;
+	Handle<Value> Domain::BlockPeek(const Arguments& args) {
+		HandleScope scope;
+		unsigned long long start = 0;
 		size_t size = 0;
 		char * buffer_ = NULL;
 		unsigned int flags = 0;
 
-        if(args.Length() < 3) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify three arguments to invoke this function")));
-        }
+		if(args.Length() < 3) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify three arguments to invoke this function")));
+		}
 
-        if(!args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string in the first and second argument")));
-        }
+		if(!args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string in the first and second argument")));
+		}
 
-        if(!args[1]->IsNumber() || !args[2]->IsNumber()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify numbers in the first and second argument")));
-        }
+		if(!args[1]->IsNumber() || !args[2]->IsNumber()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify numbers in the first and second argument")));
+		}
 
-        String::Utf8Value path(args[0]->ToString());
+		String::Utf8Value path(args[0]->ToString());
 
-        start = args[1]->NumberValue();
-        size = args[2]->NumberValue() * sizeof(char *);
+		start = args[1]->NumberValue();
+		size = args[2]->NumberValue() * sizeof(char *);
 
-        buffer_ = (char*) malloc(size);
+		buffer_ = (char*) malloc(size);
 
-        if(buffer_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
-        }
+		if(buffer_ == NULL) {
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return Null();
+		}
 
-        memset(buffer_, 0, size);
+		memset(buffer_, 0, size);
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        int ret = virDomainBlockPeek(domain->domain_, (const char *) *path, start, size, buffer_, flags);
+		int ret = virDomainBlockPeek(domain->domain_, (const char *) *path, start, size, buffer_, flags);
 
-        if(ret == -1) {
-            free(buffer_);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+		if(ret == -1) {
+			free(buffer_);
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
 
-        Buffer *buffer = Buffer::New(size);
-        memcpy(Buffer::Data(buffer), buffer_, size);
-        free(buffer_);
+		Buffer *buffer = Buffer::New(size);
+		memcpy(Buffer::Data(buffer), buffer_, size);
+		free(buffer_);
 
-        return scope.Close(buffer->handle_);
-    }
+		return scope.Close(buffer->handle_);
+	}
 
-    void BlockPullAsync(uv_work_t* req) {
-        BlockPullBaton* baton = static_cast<BlockPullBaton*>(req->data);
+	void BlockPullAsync(uv_work_t* req) {
+		BlockPullBaton* baton = static_cast<BlockPullBaton*>(req->data);
 
-        Domain *domain         = baton->domain;
-        const char *disk       = baton->disk;
-        unsigned int flags     = baton->flags;
-        unsigned int bandwidth = baton->bandwidth;
+		Domain *domain         = baton->domain;
+		const char *disk       = baton->disk;
+		unsigned int flags     = baton->flags;
+		unsigned int bandwidth = baton->bandwidth;
 
-        virErrorPtr err;
+		virErrorPtr err;
 
-        int ret = virDomainBlockPull(domain->domain_, disk, bandwidth, flags);
+		int ret = virDomainBlockPull(domain->domain_, disk, bandwidth, flags);
 
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-    }
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+	}
 
-    void BlockPullAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
+	void BlockPullAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
 
-        BlockPullBaton* baton = static_cast<BlockPullBaton*>(req->data);
-        delete req;
+		BlockPullBaton* baton = static_cast<BlockPullBaton*>(req->data);
+		delete req;
 
-        Handle<Value> argv[2];
+		Handle<Value> argv[2];
 
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
 
-        else {
-            argv[0] = Undefined();
-            argv[1] = True();
-        }
-
-        TryCatch try_catch;
+		else {
+			argv[0] = Undefined();
+			argv[1] = True();
+		}
+
+		TryCatch try_catch;
 
-        if (try_catch.HasCaught())
-          FatalException(try_catch);
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
 
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
-
-    Handle<Value> Domain::BlockPull(const Arguments& args) {
-        HandleScope scope;
-
-        Local<Object> options_;
-        Local<Function> callback_;
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+	Handle<Value> Domain::BlockPull(const Arguments& args) {
+		HandleScope scope;
+
+		Local<Object> options_;
+		Local<Function> callback_;
 
-        unsigned int bandwidth = 0;
-        unsigned int flags = 0;
-        const char* disk = "vda";
-
-        // If only callback has been specified, use defaults
-        if(args[0]->IsFunction()) {
-            callback_ = Local<Function>::Cast(args[0]);
-        }
-
-        // If options have been specified
-        else if(args[0]->IsObject()) {
-
-            // If callback has not been specified
-            if(!args[1]->IsFunction()) {
-                ThrowException(Exception::TypeError(
-                    String::New("Second argument must be a function"))
-                );
-                return scope.Close(Undefined());
-            }
-
-            options_  = Local<Object>::Cast(args[0]);
-            callback_ = Local<Function>::Cast(args[1]);
-
-            // Supported options
-            Handle<Value> disk_      = options_->Get(String::New("disk"));
-            Handle<Value> flags_     = options_->Get(String::New("flags"));
-            Handle<Value> bandwidth_ = options_->Get(String::New("bandwidth"));
-
-            // When disk option is specified
-            if (!disk_->IsUndefined()) {
-
-                // If disk option is not a string
-                if (!disk_->IsString()) {
-                    ThrowException(Exception::TypeError(
-                        String::New("Disk must be a string"))
-                    );
-                    return scope.Close(Undefined());
-                }
-
-                disk = parseString(disk_->ToString());
-            }
-
-            // When flags option is specified
-            if (!flags_->IsUndefined()) {
-
-                // If flags option is not an array
-                if (!flags_->IsArray()) {
-                    ThrowException(Exception::TypeError(
-                        String::New("Flags, must be an array"))
-                    );
-                    return scope.Close(Undefined());
-                }
-
-                Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
-                unsigned int length = flagsArr_->Length();
-
-                for (unsigned int i = 0; i < length; i++) {
-                    flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
-                }
-            }
-
-            // When bandwidth option is specified
-            if (!bandwidth_->IsUndefined()) {
-
-                if (!bandwidth_->IsNumber()) {
-                    ThrowException(Exception::TypeError(
-                        String::New("Bandwidth must be a number"))
-                    );
-                    return scope.Close(Undefined());
-                }
-
-                //bandwidth = bandwidth_->ToUint32();
-                bandwidth = bandwidth_->NumberValue();
-            }
-        }
-
-        // If first argument is neither an object nor a function
-        else {
-            return ThrowException(Exception::TypeError(
-            String::New("First argument must be an object or function")));
-        }
-
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        // Create baton
-        BlockPullBaton* baton = new BlockPullBaton();
-
-        // Add data
-        baton->callback  = Persistent<Function>::New(callback_);
-        baton->domain    = domain;
-        baton->disk      = disk;
-        baton->bandwidth = bandwidth;
-        baton->flags     = flags;
-
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
-
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            BlockPullAsync,
-            (uv_after_work_cb)BlockPullAsyncAfter
-        );
-
-        return scope.Close(Undefined());
-    }
-
-    Handle<Value> Domain::BlockRebase(const Arguments& args) {
-        HandleScope scope;
-		    unsigned int bandwidth = 0;
-		    unsigned int flags = 0;
-
-        if(args.Length() < 2) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify at least two arguments to invoke this function")));
-        }
-
-        if(!args[0]->IsString() || !args[1]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string in the first and second arguments")));
-        }
-
-        String::Utf8Value disk(args[0]->ToString());
-        String::Utf8Value base(args[1]->ToString());
-
-        if(args.Length() > 2) {
-            if(!args[2]->IsNumber()) {
-                return ThrowException(Exception::TypeError(
-                String::New("Third argument, if specified, must be a number")));
-            }
-            bandwidth = args[2]->NumberValue();
-        }
-
-        if(args.Length() > 3) {
-            if(!args[3]->IsObject()) {
-                return ThrowException(Exception::TypeError(
-                String::New("Fourth argument, if specified, must be an object")));
-            }
-
-            Local<Array> flags_ = Local<Array>::Cast(args[3]);
-            unsigned int length = flags_->Length();
-
-            for (unsigned int i = 0; i < length; i++) {
-                flags |= flags_->Get(Integer::New(i))->Int32Value();
-            }
-        }
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        int ret = virDomainBlockRebase(domain->domain_, (const char *) *disk, (const char *) *base, bandwidth, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        return True();
-    }
-
-    Handle<Value> Domain::GetBlockStats(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
-        virDomainBlockStatsStruct stats_;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value path(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainBlockStats(domain->domain_, (const char *) *path, &stats_, sizeof(stats_));
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        Local<Object> stats = Object::New();
-        stats->Set(block_stat_rd_req_symbol, Number::New(stats_.rd_req));
-        stats->Set(block_stat_rd_bytes_symbol, Number::New(stats_.rd_bytes));
-        stats->Set(block_stat_wr_req_symbol, Number::New(stats_.wr_req));
-        stats->Set(block_stat_wr_bytes_symbol, Number::New(stats_.wr_bytes));
-        stats->Set(block_stat_errs_symbol, Number::New(stats_.errs));
-
-        return scope.Close(stats);
-    }
-
-    Handle<Value> Domain::GetBlockInfo(const Arguments& args) {
-        HandleScope scope;
-        virDomainBlockInfo info_;
-        unsigned int flags = 0;
-        int ret = -1;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value path(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainGetBlockInfo(domain->domain_, (const char *) *path, &info_, flags);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        Local<Object> info = Object::New();
-        info->Set(block_info_capacity_symbol, Number::New(info_.capacity));
-        info->Set(block_info_allocation_symbol, Number::New(info_.allocation));
-        info->Set(block_info_physical_symbol, Number::New(info_.physical));
-
-        return scope.Close(info);
-    }
-
-    Handle<Value> Domain::AbortBlockJob(const Arguments& args) {
-        HandleScope scope;
-
-        Local<Object> options;
-        Local<Function> callback;
-
-        unsigned int flags = 0;
-        int ret = -1;
-        const char* disk = "vda";
-
-        // If only callback has been specified, use defaults
-        if(args[0]->IsFunction()) {
-            callback = Local<Function>::Cast(args[0]);
-        }
-
-        // If options have been specified
-        else if(args[0]->IsObject()) {
-
-            // If callback has not been specified
-            if(!args[1]->IsFunction()) {
-                ThrowException(Exception::TypeError(
-                    String::New("Second argument must be a function"))
-                );
-                return scope.Close(Undefined());
-            }
-
-            options  = Local<Object>::Cast(args[0]);
-            callback = Local<Function>::Cast(args[1]);
-
-            // Supported options
-            Handle<Value> flags_ = options->Get(String::New("flags"));
-            Handle<Value> disk_ = options->Get(String::New("disk"));
-
-            // When disk option is specified
-            if (!flags_->IsNull()) {
-
-                // If disk option is not a string
-                if (!disk_->IsString()) {
-                    ThrowException(Exception::TypeError(
-                        String::New("Disk, if specified, must be a string"))
-                    );
-                    return scope.Close(Undefined());
-                }
-
-                disk = parseString(disk_->ToString());
-            }
-
-            // When flags option is specified
-            if (!flags_->IsUndefined()) {
-
-                // If flags option is not an array
-                if (!flags_->IsArray()) {
-                    ThrowException(Exception::TypeError(
-                        String::New("Flags, if specified, must be an array"))
-                    );
-                    return scope.Close(Undefined());
-                }
-
-                Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
-                unsigned int length = flagsArr_->Length();
-
-                for (unsigned int i = 0; i < length; i++) {
-                    flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
-                }
-            }
-        }
-
-        // If first argument is neither an object nor a function
-        else {
-            return ThrowException(Exception::TypeError(
-            String::New("First argument must be an object or function")));
-        }
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainBlockJobAbort(
-            domain->domain_,
-            disk,
-            flags
-        );
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-        }
-
-        return scope.Close(Undefined());
-    }
-
-    void GetBlockJobInfoAsync(uv_work_t* req) {
-        GetBlockJobInfoBaton* baton = static_cast<GetBlockJobInfoBaton*>(req->data);
-
-        Domain *domain = baton->domain;
-        unsigned int flags = baton->flags;
-        const char *disk = baton->disk;
-
-        virDomainBlockJobInfo info;
-        virErrorPtr err;
-
-        int ret = -1;
-
-        ret = virDomainGetBlockJobInfo(domain->domain_, disk, &info, flags);
-
-        if(ret == -1) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-
-        else {
-            baton->info = info;
-        }
-    }
-
-    void GetBlockJobInfoAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
-
-        GetBlockJobInfoBaton* baton = static_cast<GetBlockJobInfoBaton*>(req->data);
-        virDomainBlockJobInfo info = baton->info;
-        delete req;
-
-        Handle<Value> argv[2];
-
-        if(!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
-
-        else {
-            Local<Object> obj = Object::New();
-
-            obj->Set(block_job_info_type_symbol,      Number::New(info.type));
-            obj->Set(block_job_info_bandwidth_symbol, Number::New(info.bandwidth));
-            obj->Set(block_job_info_cur_symbol,       Number::New(info.cur));
-            obj->Set(block_job_info_end_symbol,       Number::New(info.end));
-
-            argv[0] = Undefined();
-            argv[1] = scope.Close(obj);
-        }
-
-        TryCatch try_catch;
-
-        if (try_catch.HasCaught())
-          FatalException(try_catch);
-
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
-
-    Handle<Value> Domain::GetBlockJobInfo(const Arguments& args) {
-        HandleScope scope;
-
-        Local<Object> options;
-        Local<Function> callback;
-
-        unsigned int flags = 0;
-        const char* disk = "vda";
-
-        // If only callback has been specified, use defaults
-        if(args[0]->IsFunction()) {
-            callback = Local<Function>::Cast(args[0]);
-        }
-
-        // If options have been specified
-        else if(args[0]->IsObject()) {
-
-            // If callback has not been specified
-            if(!args[1]->IsFunction()) {
-                ThrowException(Exception::TypeError(
-                    String::New("Second argument must be a function"))
-                );
-                return scope.Close(Undefined());
-            }
-
-            options  = Local<Object>::Cast(args[0]);
-            callback = Local<Function>::Cast(args[1]);
-
-            // Supported options
-            Handle<Value> flags_ = options->Get(String::New("flags"));
-            Handle<Value> disk_ = options->Get(String::New("disk"));
-
-            // When disk option is specified
-            if (!flags_->IsNull()) {
-
-                // If disk option is not a string
-                if (!disk_->IsString()) {
-                    ThrowException(Exception::TypeError(
-                        String::New("Disk, if specified, must be a string"))
-                    );
-                    return scope.Close(Undefined());
-                }
-
-                disk = parseString(disk_->ToString());
-            }
-
-            // When flags option is specified
-            if (!flags_->IsUndefined()) {
-
-                // If flags option is not an array
-                if (!flags_->IsArray()) {
-                    ThrowException(Exception::TypeError(
-                        String::New("Flags, if specified, must be an array"))
-                    );
-                    return scope.Close(Undefined());
-                }
-
-                Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
-                unsigned int length = flagsArr_->Length();
-
-                for (unsigned int i = 0; i < length; i++) {
-                    flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
-                }
-            }
-        }
-
-        // If first argument is neither an object nor a function
-        else {
-            return ThrowException(Exception::TypeError(
-            String::New("First argument must be an object or function")));
-        }
-
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        // Create baton
-        GetBlockJobInfoBaton* baton = new GetBlockJobInfoBaton();
-
-        // Add data to baton
-        baton->callback = Persistent<Function>::New(callback);
-        baton->domain   = domain;
-        baton->disk     = disk;
-        baton->flags    = flags;
-
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
-
-        // Dipatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            GetBlockJobInfoAsync,
-            (uv_after_work_cb)GetBlockJobInfoAsyncAfter
-        );
-
-        return scope.Close(Undefined());
-    }
-
-    Handle<Value> Domain::GetInterfaceStats(const Arguments& args) {
-        HandleScope scope;
-        struct _virDomainInterfaceStats stats_;
-        int ret = -1;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value device(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainInterfaceStats(domain->domain_, (const char *) *device, &stats_, sizeof(stats_));
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        Local<Object> stats = Object::New();
-        stats->Set(nwiface_stat_rx_bytes_symbol, Number::New(stats_.rx_bytes));
-        stats->Set(nwiface_stat_rx_packets_symbol, Number::New(stats_.rx_packets));
-        stats->Set(nwiface_stat_rx_errors_symbol, Number::New(stats_.rx_errs));
-        stats->Set(nwiface_stat_rx_drop_symbol, Number::New(stats_.rx_drop));
-        stats->Set(nwiface_stat_tx_bytes_symbol, Number::New(stats_.tx_bytes));
-        stats->Set(nwiface_stat_tx_packets_symbol, Number::New(stats_.tx_packets));
-        stats->Set(nwiface_stat_tx_errors_symbol, Number::New(stats_.tx_errs));
-        stats->Set(nwiface_stat_tx_drop_symbol, Number::New(stats_.tx_drop));
-
-        return scope.Close(stats);
-    }
-
-    Handle<Value> Domain::CoreDump(const Arguments& args) {
-        HandleScope scope;
-        int flags = 0;
-        int ret = -1;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value path(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainCoreDump(domain->domain_, (const char *) *path, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return True();
-    }
-
-    Handle<Value> Domain::HasCurrentSnapshot(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainHasCurrentSnapshot(domain->domain_, flags);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return ret == 1 ? True() : False();
-    }
-
-    void RevertToSnapshotAsync(uv_work_t* req) {
-
-        RevertToSnapshotBaton* baton = static_cast<RevertToSnapshotBaton*>(req->data);
-
-        Domain *domain = baton->domain;
-        const char *name = baton->name;
-        //unsigned int lookupflags = baton->lookupflags;
-        unsigned int revertflags = baton->revertflags;
-
-        virDomainSnapshotPtr snapshot = NULL;
-        virErrorPtr err;
-
-        int ret = -1;
-
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, name, baton->lookupflags);
-
-        if(snapshot == NULL) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-
-        else {
-            ret = virDomainRevertToSnapshot(snapshot, revertflags);
-
-            if(ret == -1) {
-                err = virGetLastError();
-                baton->error = err->message;
-            }
-
-            else {
-                virDomainSnapshotFree(snapshot);
-            }
-        }
-    }
-
-    void RevertToSnapshotAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
-
-        RevertToSnapshotBaton* baton = static_cast<RevertToSnapshotBaton*>(req->data);
-        delete req;
-
-        Handle<Value> argv[2];
-
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
-
-        else {
-            argv[0] = Undefined();
-            argv[1] = True();
-        }
-
-        TryCatch try_catch;
-
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
-
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
-
-    Handle<Value> Domain::RevertToSnapshot(const Arguments& args) {
-        HandleScope scope;
-
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        unsigned int lookupflags = 0;
-        unsigned int revertflags = 0;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-
-        // Domain name
-        const char *name = parseString(args[0]);
-
-        if (args.Length() > 1) {
-            if (!args[1]->IsObject()) {
-                return ThrowException(Exception::TypeError(
-                String::New("Second argument, if provided, must be an object to invoke this function")));
-            }
-
-            Local<Array> flags_ = Local<Array>::Cast(args[1]);
-            unsigned int length = flags_->Length();
-
-            for (unsigned int i = 0; i < length; i++) {
-                revertflags |= flags_->Get(Integer::New(i))->Int32Value();
-            }
-        }
-
-        // Create baton
-        RevertToSnapshotBaton* baton = new RevertToSnapshotBaton();
-
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[2]);
-        baton->callback = Persistent<Function>::New(callback);
-
-        // Add data to baton
-        baton->domain = domain;
-        baton->name = name;
-        baton->lookupflags = lookupflags;
-        baton->revertflags = revertflags;
-
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
-
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            RevertToSnapshotAsync,
-            (uv_after_work_cb)RevertToSnapshotAsyncAfter
-        );
-
-        return Undefined();
-    }
-
-    void TakeSnapshotAsync(uv_work_t* req) {
-
-        TakeSnapshotBaton* baton = static_cast<TakeSnapshotBaton*>(req->data);
-
-        Domain *domain = baton->domain;
-        const char *xml = baton->xml;
-        unsigned int flags = baton->flags;
-
-        virDomainSnapshotPtr snapshot = NULL;
-        virErrorPtr err;
-
-        snapshot = virDomainSnapshotCreateXML(domain->domain_, xml, flags);
-
-        if(snapshot == NULL) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-
-        else {
-            virDomainSnapshotFree(snapshot);
-        }
-    }
-
-    void TakeSnapshotAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
-
-        TakeSnapshotBaton* baton = static_cast<TakeSnapshotBaton*>(req->data);
-        delete req;
-
-        Handle<Value> argv[2];
-
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
-
-        else {
-            argv[0] = Undefined();
-            argv[1] = scope.Close(True());
-        }
-
-        TryCatch try_catch;
-
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
-
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
-
-    Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
-        HandleScope scope;
-
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        // XML
-        const char *xml = parseString(args[0]);
-
-        // Flags
-        unsigned int flags = 0;
-
-        // Parse args
-        if(args.Length() > 0) {
-            if (!args[0]->IsString()) {
-                return ThrowException(Exception::TypeError(
-                String::New("First argument, if provided, must be a string")));
-            }
-
-            if (args.Length() > 1) {
-                if (!args[1]->IsObject()) {
-                    return ThrowException(Exception::TypeError(
-                    String::New("Second argument, if provided, must be an object")));
-                }
-
-                Local<Array> flags_ = Local<Array>::Cast(args[1]);
-                unsigned int length = flags_->Length();
-
-                for (unsigned int i = 0; i < length; i++) {
-                    flags |= flags_->Get(Integer::New(i))->Int32Value();
-                }
-            }
-        }
-
-        // Create baton
-        TakeSnapshotBaton* baton = new TakeSnapshotBaton();
-
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[2]);
-        baton->callback = Persistent<Function>::New(callback);
-
-        // Add data to baton
-        baton->domain = domain;
-        baton->flags = flags;
-        baton->xml = xml;
-
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
-
-        // Dispatch work
-        uv_queue_work(
-            uv_default_loop(),
-            req,
-            TakeSnapshotAsync,
-            (uv_after_work_cb)TakeSnapshotAsyncAfter
-        );
-
-        return scope.Close(Undefined());
-    }
-
-    /*Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
-        HandleScope scope;
-        virDomainSnapshotPtr snapshot = NULL;
-        unsigned int flags = 0;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        if(args.Length() > 0) {
-            if (!args[0]->IsString()) {
-                return ThrowException(Exception::TypeError(
-                String::New("First argument, if provided, must be a string to invoke this function")));
-            }
-
-            String::Utf8Value xml(args[0]->ToString());
-
-            if (args.Length() > 1) {
-                if (!args[1]->IsObject()) {
-                    return ThrowException(Exception::TypeError(
-                    String::New("Second argument, if provided, must be an object to invoke this function")));
-                }
-
-                Local<Array> flags_ = Local<Array>::Cast(args[1]);
-                unsigned int length = flags_->Length();
-
-                for (unsigned int i = 0; i < length; i++) {
-                    flags |= flags_->Get(Integer::New(i))->Int32Value();
-                }
-            }
-
-            snapshot = virDomainSnapshotCreateXML(domain->domain_, (const char *) *xml, flags);
-
-        } else {
-            snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
-        }
-
-        if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-        virDomainSnapshotFree(snapshot);
-
-        return True();
-    }*/
-
-    Handle<Value> Domain::GetCurrentSnapshot(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        virDomainSnapshotPtr snapshot = NULL;
-        char* xml_ = NULL;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
-
-        if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        xml_ = virDomainSnapshotGetXMLDesc(snapshot, flags);
-        if(xml_ == NULL) {
-            virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        virDomainSnapshotFree(snapshot);
-        //TODO serialize to json
-
-        Local<String> xml = String::New(xml_);
-        free(xml_);
-
-        return scope.Close(xml);
-    }
-
-    void DeleteSnapshotAsync(uv_work_t* req) {
-
-        DeleteSnapshotBaton* baton = static_cast<DeleteSnapshotBaton*>(req->data);
-
-        Domain *domain = baton->domain;
-        const char *name = baton->name;
-        unsigned int flags = baton->flags;
-
-        virDomainSnapshotPtr snapshot = NULL;
-        virErrorPtr err;
-
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, name, 0);
-
-        if(snapshot == NULL) {
-            err = virGetLastError();
-            baton->error = err->message;
-        }
-
-        else {
-            int ret = virDomainSnapshotDelete(snapshot, flags);
-            if(ret == -1) {
-                err = virGetLastError();
-                baton->error = err->message;
-            }
-
-            else {
-                virDomainSnapshotFree(snapshot);
-            }
-        }
-    }
-
-    void DeleteSnapshotAsyncAfter(uv_work_t* req) {
-        HandleScope scope;
-
-        DeleteSnapshotBaton* baton = static_cast<DeleteSnapshotBaton*>(req->data);
-        delete req;
-
-        Handle<Value> argv[2];
-
-        if (!baton->error.empty()) {
-            argv[0] = Exception::Error(String::New(baton->error.c_str()));
-            argv[1] = Undefined();
-        }
-
-        else {
-            argv[0] = Undefined();
-            argv[1] = True();
-        }
-
-        TryCatch try_catch;
-
-        if (try_catch.HasCaught())
-            FatalException(try_catch);
-
-        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton;
-    }
-
-    Handle<Value> Domain::DeleteSnapshot(const Arguments& args) {
-        HandleScope scope;
-
-        // Domain context
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        // Flags
-        unsigned int flags = 0;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("First argument must be a string")));
-        }
-
-        // Domain name
-        const char *name = parseString(args[0]);
-
-        if (args.Length() > 1) {
-            if (!args[1]->IsObject()) {
-            return ThrowException(Exception::TypeError(
-                String::New("Second argument must be an object")));
-            }
-
-            Local<Array> flags_ = Local<Array>::Cast(args[1]);
-            unsigned int length = flags_->Length();
-
-            for (unsigned int i = 0; i < length; i++) {
-                flags |= flags_->Get(Integer::New(i))->Int32Value();
-            }
-        }
-
-        // Create baton
-        DeleteSnapshotBaton* baton = new DeleteSnapshotBaton();
-
-        // Callback
-        Local<Function> callback = Local<Function>::Cast(args[2]);
-        baton->callback = Persistent<Function>::New(callback);
-
-        // Add data to baton
-        baton->domain = domain;
-        baton->name = name;
-        baton->flags = flags;
-
-        // Compose req
-        uv_work_t* req = new uv_work_t;
-        req->data = baton;
-
-        uv_queue_work(
-          uv_default_loop(),
-          req,
-          DeleteSnapshotAsync,
-          (uv_after_work_cb)DeleteSnapshotAsyncAfter
-        );
-
-        return True();
-    }
-
-    Handle<Value> Domain::LookupSnapshotByName(const Arguments& args) {
-        HandleScope scope;
-        char* xml_ = NULL;
-        unsigned int flags = 0;
-        virDomainSnapshotPtr snapshot = NULL;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value name(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, flags);
-        if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        xml_ = virDomainSnapshotGetXMLDesc(snapshot, flags);
-        if(xml_ == NULL) {
-            virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        virDomainSnapshotFree(snapshot);
-        //TODO serialize to json
-
-        Local<String> xml = String::New(xml_);
-        free(xml_);
-
-        return scope.Close(xml);
-    }
-
-    Handle<Value> Domain::GetSnapshots(const Arguments& args) {
-        HandleScope scope;
-        char **snapshots_ = NULL;
-        unsigned int flags = 0;
-        int num_snapshots = 0;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        num_snapshots = virDomainSnapshotNum(domain->domain_, flags);
-
-        if(num_snapshots == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        snapshots_ = (char**) malloc(sizeof(*snapshots_) * num_snapshots);
-        if(snapshots_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
-        }
-
-        num_snapshots = virDomainSnapshotListNames(domain->domain_, snapshots_, num_snapshots, flags);
-        if(num_snapshots == -1) {
-            free(snapshots_);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        Local<Array> snapshots = Array::New(num_snapshots);
-        for (int i = 0; i < num_snapshots; i++) {
-            virDomainSnapshotPtr snapshot = virDomainSnapshotLookupByName(domain->domain_, snapshots_[i], flags);
-            char *xml = virDomainSnapshotGetXMLDesc(snapshot, flags);
-            virDomainSnapshotFree(snapshot);
-
-            snapshots->Set(Integer::New(i), String::New(xml));
-            free(snapshots_[i]);
-            free(xml);
-        }
-        free(snapshots_);
-
-        return scope.Close(snapshots);
-    }
+		unsigned int bandwidth = 0;
+		unsigned int flags = 0;
+		const char* disk = "vda";
+
+		// If only callback has been specified, use defaults
+		if(args[0]->IsFunction()) {
+			callback_ = Local<Function>::Cast(args[0]);
+		}
+
+		// If options have been specified
+		else if(args[0]->IsObject()) {
+
+			// If callback has not been specified
+			if(!args[1]->IsFunction()) {
+				ThrowException(Exception::TypeError(
+							String::New("Second argument must be a function"))
+						);
+				return scope.Close(Undefined());
+			}
+
+			options_  = Local<Object>::Cast(args[0]);
+			callback_ = Local<Function>::Cast(args[1]);
+
+			// Supported options
+			Handle<Value> disk_      = options_->Get(String::New("disk"));
+			Handle<Value> flags_     = options_->Get(String::New("flags"));
+			Handle<Value> bandwidth_ = options_->Get(String::New("bandwidth"));
+
+			// When disk option is specified
+			if (!disk_->IsUndefined()) {
+
+				// If disk option is not a string
+				if (!disk_->IsString()) {
+					ThrowException(Exception::TypeError(
+								String::New("Disk must be a string"))
+							);
+					return scope.Close(Undefined());
+				}
+
+				disk = parseString(disk_->ToString());
+			}
+
+			// When flags option is specified
+			if (!flags_->IsUndefined()) {
+
+				// If flags option is not an array
+				if (!flags_->IsArray()) {
+					ThrowException(Exception::TypeError(
+								String::New("Flags, must be an array"))
+							);
+					return scope.Close(Undefined());
+				}
+
+				Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
+				unsigned int length = flagsArr_->Length();
+
+				for (unsigned int i = 0; i < length; i++) {
+					flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
+				}
+			}
+
+			// When bandwidth option is specified
+			if (!bandwidth_->IsUndefined()) {
+
+				if (!bandwidth_->IsNumber()) {
+					ThrowException(Exception::TypeError(
+								String::New("Bandwidth must be a number"))
+							);
+					return scope.Close(Undefined());
+				}
+
+				//bandwidth = bandwidth_->ToUint32();
+				bandwidth = bandwidth_->NumberValue();
+			}
+		}
+
+		// If first argument is neither an object nor a function
+		else {
+			return ThrowException(Exception::TypeError(
+						String::New("First argument must be an object or function")));
+		}
+
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		// Create baton
+		BlockPullBaton* baton = new BlockPullBaton();
+
+		// Add data
+		baton->callback  = Persistent<Function>::New(callback_);
+		baton->domain    = domain;
+		baton->disk      = disk;
+		baton->bandwidth = bandwidth;
+		baton->flags     = flags;
+
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
+
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				BlockPullAsync,
+				(uv_after_work_cb)BlockPullAsyncAfter
+				);
+
+		return scope.Close(Undefined());
+	}
+
+	Handle<Value> Domain::BlockRebase(const Arguments& args) {
+		HandleScope scope;
+		unsigned int bandwidth = 0;
+		unsigned int flags = 0;
+
+		if(args.Length() < 2) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify at least two arguments to invoke this function")));
+		}
+
+		if(!args[0]->IsString() || !args[1]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string in the first and second arguments")));
+		}
+
+		String::Utf8Value disk(args[0]->ToString());
+		String::Utf8Value base(args[1]->ToString());
+
+		if(args.Length() > 2) {
+			if(!args[2]->IsNumber()) {
+				return ThrowException(Exception::TypeError(
+							String::New("Third argument, if specified, must be a number")));
+			}
+			bandwidth = args[2]->NumberValue();
+		}
+
+		if(args.Length() > 3) {
+			if(!args[3]->IsObject()) {
+				return ThrowException(Exception::TypeError(
+							String::New("Fourth argument, if specified, must be an object")));
+			}
+
+			Local<Array> flags_ = Local<Array>::Cast(args[3]);
+			unsigned int length = flags_->Length();
+
+			for (unsigned int i = 0; i < length; i++) {
+				flags |= flags_->Get(Integer::New(i))->Int32Value();
+			}
+		}
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		int ret = virDomainBlockRebase(domain->domain_, (const char *) *disk, (const char *) *base, bandwidth, flags);
+
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		return True();
+	}
+
+	Handle<Value> Domain::GetBlockStats(const Arguments& args) {
+		HandleScope scope;
+		int ret = -1;
+		virDomainBlockStatsStruct stats_;
+
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as argument to invoke this function")));
+		}
+		String::Utf8Value path(args[0]->ToString());
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		ret = virDomainBlockStats(domain->domain_, (const char *) *path, &stats_, sizeof(stats_));
+
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		Local<Object> stats = Object::New();
+		stats->Set(block_stat_rd_req_symbol, Number::New(stats_.rd_req));
+		stats->Set(block_stat_rd_bytes_symbol, Number::New(stats_.rd_bytes));
+		stats->Set(block_stat_wr_req_symbol, Number::New(stats_.wr_req));
+		stats->Set(block_stat_wr_bytes_symbol, Number::New(stats_.wr_bytes));
+		stats->Set(block_stat_errs_symbol, Number::New(stats_.errs));
+
+		return scope.Close(stats);
+	}
+
+	Handle<Value> Domain::GetBlockInfo(const Arguments& args) {
+		HandleScope scope;
+		virDomainBlockInfo info_;
+		unsigned int flags = 0;
+		int ret = -1;
+
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as argument to invoke this function")));
+		}
+		String::Utf8Value path(args[0]->ToString());
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		ret = virDomainGetBlockInfo(domain->domain_, (const char *) *path, &info_, flags);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		Local<Object> info = Object::New();
+		info->Set(block_info_capacity_symbol, Number::New(info_.capacity));
+		info->Set(block_info_allocation_symbol, Number::New(info_.allocation));
+		info->Set(block_info_physical_symbol, Number::New(info_.physical));
+
+		return scope.Close(info);
+	}
+
+	Handle<Value> Domain::AbortBlockJob(const Arguments& args) {
+		HandleScope scope;
+
+		Local<Object> options;
+		Local<Function> callback;
+
+		unsigned int flags = 0;
+		int ret = -1;
+		const char* disk = "vda";
+
+		// If only callback has been specified, use defaults
+		if(args[0]->IsFunction()) {
+			callback = Local<Function>::Cast(args[0]);
+		}
+
+		// If options have been specified
+		else if(args[0]->IsObject()) {
+
+			// If callback has not been specified
+			if(!args[1]->IsFunction()) {
+				ThrowException(Exception::TypeError(
+							String::New("Second argument must be a function"))
+						);
+				return scope.Close(Undefined());
+			}
+
+			options  = Local<Object>::Cast(args[0]);
+			callback = Local<Function>::Cast(args[1]);
+
+			// Supported options
+			Handle<Value> flags_ = options->Get(String::New("flags"));
+			Handle<Value> disk_ = options->Get(String::New("disk"));
+
+			// When disk option is specified
+			if (!flags_->IsNull()) {
+
+				// If disk option is not a string
+				if (!disk_->IsString()) {
+					ThrowException(Exception::TypeError(
+								String::New("Disk, if specified, must be a string"))
+							);
+					return scope.Close(Undefined());
+				}
+
+				disk = parseString(disk_->ToString());
+			}
+
+			// When flags option is specified
+			if (!flags_->IsUndefined()) {
+
+				// If flags option is not an array
+				if (!flags_->IsArray()) {
+					ThrowException(Exception::TypeError(
+								String::New("Flags, if specified, must be an array"))
+							);
+					return scope.Close(Undefined());
+				}
+
+				Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
+				unsigned int length = flagsArr_->Length();
+
+				for (unsigned int i = 0; i < length; i++) {
+					flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
+				}
+			}
+		}
+
+		// If first argument is neither an object nor a function
+		else {
+			return ThrowException(Exception::TypeError(
+						String::New("First argument must be an object or function")));
+		}
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		ret = virDomainBlockJobAbort(
+				domain->domain_,
+				disk,
+				flags
+				);
+
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+		}
+
+		return scope.Close(Undefined());
+	}
+
+	void GetBlockJobInfoAsync(uv_work_t* req) {
+		GetBlockJobInfoBaton* baton = static_cast<GetBlockJobInfoBaton*>(req->data);
+
+		Domain *domain = baton->domain;
+		unsigned int flags = baton->flags;
+		const char *disk = baton->disk;
+
+		virDomainBlockJobInfo info;
+		virErrorPtr err;
+
+		int ret = -1;
+
+		ret = virDomainGetBlockJobInfo(domain->domain_, disk, &info, flags);
+
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		else {
+			baton->info = info;
+		}
+	}
+
+	void GetBlockJobInfoAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		GetBlockJobInfoBaton* baton = static_cast<GetBlockJobInfoBaton*>(req->data);
+		virDomainBlockJobInfo info = baton->info;
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if(!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			Local<Object> obj = Object::New();
+
+			obj->Set(block_job_info_type_symbol,      Number::New(info.type));
+			obj->Set(block_job_info_bandwidth_symbol, Number::New(info.bandwidth));
+			obj->Set(block_job_info_cur_symbol,       Number::New(info.cur));
+			obj->Set(block_job_info_end_symbol,       Number::New(info.end));
+
+			argv[0] = Undefined();
+			argv[1] = scope.Close(obj);
+		}
+
+		TryCatch try_catch;
+
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+	Handle<Value> Domain::GetBlockJobInfo(const Arguments& args) {
+		HandleScope scope;
+
+		Local<Object> options;
+		Local<Function> callback;
+
+		unsigned int flags = 0;
+		const char* disk = "vda";
+
+		// If only callback has been specified, use defaults
+		if(args[0]->IsFunction()) {
+			callback = Local<Function>::Cast(args[0]);
+		}
+
+		// If options have been specified
+		else if(args[0]->IsObject()) {
+
+			// If callback has not been specified
+			if(!args[1]->IsFunction()) {
+				ThrowException(Exception::TypeError(
+							String::New("Second argument must be a function"))
+						);
+				return scope.Close(Undefined());
+			}
+
+			options  = Local<Object>::Cast(args[0]);
+			callback = Local<Function>::Cast(args[1]);
+
+			// Supported options
+			Handle<Value> flags_ = options->Get(String::New("flags"));
+			Handle<Value> disk_ = options->Get(String::New("disk"));
+
+			// When disk option is specified
+			if (!flags_->IsNull()) {
+
+				// If disk option is not a string
+				if (!disk_->IsString()) {
+					ThrowException(Exception::TypeError(
+								String::New("Disk, if specified, must be a string"))
+							);
+					return scope.Close(Undefined());
+				}
+
+				disk = parseString(disk_->ToString());
+			}
+
+			// When flags option is specified
+			if (!flags_->IsUndefined()) {
+
+				// If flags option is not an array
+				if (!flags_->IsArray()) {
+					ThrowException(Exception::TypeError(
+								String::New("Flags, if specified, must be an array"))
+							);
+					return scope.Close(Undefined());
+				}
+
+				Local<Array> flagsArr_ = Local<Array>(Array::Cast(*flags_));
+				unsigned int length = flagsArr_->Length();
+
+				for (unsigned int i = 0; i < length; i++) {
+					flags |= flagsArr_->Get(Integer::New(i))->Int32Value();
+				}
+			}
+		}
+
+		// If first argument is neither an object nor a function
+		else {
+			return ThrowException(Exception::TypeError(
+						String::New("First argument must be an object or function")));
+		}
+
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		// Create baton
+		GetBlockJobInfoBaton* baton = new GetBlockJobInfoBaton();
+
+		// Add data to baton
+		baton->callback = Persistent<Function>::New(callback);
+		baton->domain   = domain;
+		baton->disk     = disk;
+		baton->flags    = flags;
+
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
+
+		// Dipatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				GetBlockJobInfoAsync,
+				(uv_after_work_cb)GetBlockJobInfoAsyncAfter
+				);
+
+		return scope.Close(Undefined());
+	}
+
+	Handle<Value> Domain::GetInterfaceStats(const Arguments& args) {
+		HandleScope scope;
+		struct _virDomainInterfaceStats stats_;
+		int ret = -1;
+
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as argument to invoke this function")));
+		}
+		String::Utf8Value device(args[0]->ToString());
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		ret = virDomainInterfaceStats(domain->domain_, (const char *) *device, &stats_, sizeof(stats_));
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		Local<Object> stats = Object::New();
+		stats->Set(nwiface_stat_rx_bytes_symbol, Number::New(stats_.rx_bytes));
+		stats->Set(nwiface_stat_rx_packets_symbol, Number::New(stats_.rx_packets));
+		stats->Set(nwiface_stat_rx_errors_symbol, Number::New(stats_.rx_errs));
+		stats->Set(nwiface_stat_rx_drop_symbol, Number::New(stats_.rx_drop));
+		stats->Set(nwiface_stat_tx_bytes_symbol, Number::New(stats_.tx_bytes));
+		stats->Set(nwiface_stat_tx_packets_symbol, Number::New(stats_.tx_packets));
+		stats->Set(nwiface_stat_tx_errors_symbol, Number::New(stats_.tx_errs));
+		stats->Set(nwiface_stat_tx_drop_symbol, Number::New(stats_.tx_drop));
+
+		return scope.Close(stats);
+	}
+
+	Handle<Value> Domain::CoreDump(const Arguments& args) {
+		HandleScope scope;
+		int flags = 0;
+		int ret = -1;
+
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as argument to invoke this function")));
+		}
+		String::Utf8Value path(args[0]->ToString());
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		ret = virDomainCoreDump(domain->domain_, (const char *) *path, flags);
+
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
+
+		return True();
+	}
+
+	Handle<Value> Domain::HasCurrentSnapshot(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		int ret = -1;
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		ret = virDomainHasCurrentSnapshot(domain->domain_, flags);
+		if(ret == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return False();
+		}
+
+		return ret == 1 ? True() : False();
+	}
+
+	void RevertToSnapshotAsync(uv_work_t* req) {
+
+		RevertToSnapshotBaton* baton = static_cast<RevertToSnapshotBaton*>(req->data);
+
+		Domain *domain = baton->domain;
+		const char *name = baton->name;
+		//unsigned int lookupflags = baton->lookupflags;
+		unsigned int revertflags = baton->revertflags;
+
+		virDomainSnapshotPtr snapshot = NULL;
+		virErrorPtr err;
+
+		int ret = -1;
+
+		snapshot = virDomainSnapshotLookupByName(domain->domain_, name, baton->lookupflags);
+
+		if(snapshot == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		else {
+			ret = virDomainRevertToSnapshot(snapshot, revertflags);
+
+			if(ret == -1) {
+				err = virGetLastError();
+				baton->error = err->message;
+			}
+
+			else {
+				virDomainSnapshotFree(snapshot);
+			}
+		}
+	}
+
+	void RevertToSnapshotAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		RevertToSnapshotBaton* baton = static_cast<RevertToSnapshotBaton*>(req->data);
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			argv[0] = Undefined();
+			argv[1] = True();
+		}
+
+		TryCatch try_catch;
+
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+	Handle<Value> Domain::RevertToSnapshot(const Arguments& args) {
+		HandleScope scope;
+
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		unsigned int lookupflags = 0;
+		unsigned int revertflags = 0;
+
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as argument to invoke this function")));
+		}
+
+		// Domain name
+		const char *name = parseString(args[0]);
+
+		if (args.Length() > 1) {
+			if (!args[1]->IsObject()) {
+				return ThrowException(Exception::TypeError(
+							String::New("Second argument, if provided, must be an object to invoke this function")));
+			}
+
+			Local<Array> flags_ = Local<Array>::Cast(args[1]);
+			unsigned int length = flags_->Length();
+
+			for (unsigned int i = 0; i < length; i++) {
+				revertflags |= flags_->Get(Integer::New(i))->Int32Value();
+			}
+		}
+
+		// Create baton
+		RevertToSnapshotBaton* baton = new RevertToSnapshotBaton();
+
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[2]);
+		baton->callback = Persistent<Function>::New(callback);
+
+		// Add data to baton
+		baton->domain = domain;
+		baton->name = name;
+		baton->lookupflags = lookupflags;
+		baton->revertflags = revertflags;
+
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
+
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				RevertToSnapshotAsync,
+				(uv_after_work_cb)RevertToSnapshotAsyncAfter
+				);
+
+		return Undefined();
+	}
+
+	void TakeSnapshotAsync(uv_work_t* req) {
+
+		TakeSnapshotBaton* baton = static_cast<TakeSnapshotBaton*>(req->data);
+
+		Domain *domain = baton->domain;
+		const char *xml = baton->xml;
+		unsigned int flags = baton->flags;
+
+		virDomainSnapshotPtr snapshot = NULL;
+		virErrorPtr err;
+
+		snapshot = virDomainSnapshotCreateXML(domain->domain_, xml, flags);
+
+		if(snapshot == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		else {
+			virDomainSnapshotFree(snapshot);
+		}
+	}
+
+	void TakeSnapshotAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		TakeSnapshotBaton* baton = static_cast<TakeSnapshotBaton*>(req->data);
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			argv[0] = Undefined();
+			argv[1] = scope.Close(True());
+		}
+
+		TryCatch try_catch;
+
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+	Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
+		HandleScope scope;
+
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		// XML
+		const char *xml = parseString(args[0]);
+
+		// Flags
+		unsigned int flags = 0;
+
+		// Parse args
+		if(args.Length() > 0) {
+			if (!args[0]->IsString()) {
+				return ThrowException(Exception::TypeError(
+							String::New("First argument, if provided, must be a string")));
+			}
+
+			if (args.Length() > 1) {
+				if (!args[1]->IsObject()) {
+					return ThrowException(Exception::TypeError(
+								String::New("Second argument, if provided, must be an object")));
+				}
+
+				Local<Array> flags_ = Local<Array>::Cast(args[1]);
+				unsigned int length = flags_->Length();
+
+				for (unsigned int i = 0; i < length; i++) {
+					flags |= flags_->Get(Integer::New(i))->Int32Value();
+				}
+			}
+		}
+
+		// Create baton
+		TakeSnapshotBaton* baton = new TakeSnapshotBaton();
+
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[2]);
+		baton->callback = Persistent<Function>::New(callback);
+
+		// Add data to baton
+		baton->domain = domain;
+		baton->flags = flags;
+		baton->xml = xml;
+
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
+
+		// Dispatch work
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				TakeSnapshotAsync,
+				(uv_after_work_cb)TakeSnapshotAsyncAfter
+				);
+
+		return scope.Close(Undefined());
+	}
+
+	/*Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
+		HandleScope scope;
+		virDomainSnapshotPtr snapshot = NULL;
+		unsigned int flags = 0;
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		if(args.Length() > 0) {
+		if (!args[0]->IsString()) {
+		return ThrowException(Exception::TypeError(
+		String::New("First argument, if provided, must be a string to invoke this function")));
+		}
+
+		String::Utf8Value xml(args[0]->ToString());
+
+		if (args.Length() > 1) {
+		if (!args[1]->IsObject()) {
+		return ThrowException(Exception::TypeError(
+		String::New("Second argument, if provided, must be an object to invoke this function")));
+		}
+
+		Local<Array> flags_ = Local<Array>::Cast(args[1]);
+		unsigned int length = flags_->Length();
+
+		for (unsigned int i = 0; i < length; i++) {
+		flags |= flags_->Get(Integer::New(i))->Int32Value();
+		}
+		}
+
+		snapshot = virDomainSnapshotCreateXML(domain->domain_, (const char *) *xml, flags);
+
+		} else {
+		snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
+		}
+
+		if(snapshot == NULL) {
+		ThrowException(Error::New(virGetLastError()));
+		return False();
+		}
+		virDomainSnapshotFree(snapshot);
+
+		return True();
+		}*/
+
+	Handle<Value> Domain::GetCurrentSnapshot(const Arguments& args) {
+		HandleScope scope;
+		unsigned int flags = 0;
+		virDomainSnapshotPtr snapshot = NULL;
+		char* xml_ = NULL;
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
+
+		if(snapshot == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		xml_ = virDomainSnapshotGetXMLDesc(snapshot, flags);
+		if(xml_ == NULL) {
+			virDomainSnapshotFree(snapshot);
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+		virDomainSnapshotFree(snapshot);
+		//TODO serialize to json
+
+		Local<String> xml = String::New(xml_);
+		free(xml_);
+
+		return scope.Close(xml);
+	}
+
+	void DeleteSnapshotAsync(uv_work_t* req) {
+
+		DeleteSnapshotBaton* baton = static_cast<DeleteSnapshotBaton*>(req->data);
+
+		Domain *domain = baton->domain;
+		const char *name = baton->name;
+		unsigned int flags = baton->flags;
+
+		virDomainSnapshotPtr snapshot = NULL;
+		virErrorPtr err;
+
+		snapshot = virDomainSnapshotLookupByName(domain->domain_, name, 0);
+
+		if(snapshot == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		else {
+			int ret = virDomainSnapshotDelete(snapshot, flags);
+			if(ret == -1) {
+				err = virGetLastError();
+				baton->error = err->message;
+			}
+
+			else {
+				virDomainSnapshotFree(snapshot);
+			}
+		}
+	}
+
+	void DeleteSnapshotAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		DeleteSnapshotBaton* baton = static_cast<DeleteSnapshotBaton*>(req->data);
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			argv[0] = Undefined();
+			argv[1] = True();
+		}
+
+		TryCatch try_catch;
+
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+	Handle<Value> Domain::DeleteSnapshot(const Arguments& args) {
+		HandleScope scope;
+
+		// Domain context
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		// Flags
+		unsigned int flags = 0;
+
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("First argument must be a string")));
+		}
+
+		// Domain name
+		const char *name = parseString(args[0]);
+
+		if (args.Length() > 1) {
+			if (!args[1]->IsObject()) {
+				return ThrowException(Exception::TypeError(
+							String::New("Second argument must be an object")));
+			}
+
+			Local<Array> flags_ = Local<Array>::Cast(args[1]);
+			unsigned int length = flags_->Length();
+
+			for (unsigned int i = 0; i < length; i++) {
+				flags |= flags_->Get(Integer::New(i))->Int32Value();
+			}
+		}
+
+		// Create baton
+		DeleteSnapshotBaton* baton = new DeleteSnapshotBaton();
+
+		// Callback
+		Local<Function> callback = Local<Function>::Cast(args[2]);
+		baton->callback = Persistent<Function>::New(callback);
+
+		// Add data to baton
+		baton->domain = domain;
+		baton->name = name;
+		baton->flags = flags;
+
+		// Compose req
+		uv_work_t* req = new uv_work_t;
+		req->data = baton;
+
+		uv_queue_work(
+				uv_default_loop(),
+				req,
+				DeleteSnapshotAsync,
+				(uv_after_work_cb)DeleteSnapshotAsyncAfter
+				);
+
+		return True();
+	}
+
+	Handle<Value> Domain::LookupSnapshotByName(const Arguments& args) {
+		HandleScope scope;
+		char* xml_ = NULL;
+		unsigned int flags = 0;
+		virDomainSnapshotPtr snapshot = NULL;
+
+		if(args.Length() == 0 || !args[0]->IsString()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a string as argument to invoke this function")));
+		}
+		String::Utf8Value name(args[0]->ToString());
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+		snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, flags);
+		if(snapshot == NULL) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		xml_ = virDomainSnapshotGetXMLDesc(snapshot, flags);
+		if(xml_ == NULL) {
+			virDomainSnapshotFree(snapshot);
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+		virDomainSnapshotFree(snapshot);
+		//TODO serialize to json
+
+		Local<String> xml = String::New(xml_);
+		free(xml_);
+
+		return scope.Close(xml);
+	}
+
+	Handle<Value> Domain::GetSnapshots(const Arguments& args) {
+		HandleScope scope;
+		char **snapshots_ = NULL;
+		unsigned int flags = 0;
+		int num_snapshots = 0;
+
+		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+		num_snapshots = virDomainSnapshotNum(domain->domain_, flags);
+
+		if(num_snapshots == -1) {
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		snapshots_ = (char**) malloc(sizeof(*snapshots_) * num_snapshots);
+		if(snapshots_ == NULL) {
+			LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
+			return Null();
+		}
+
+		num_snapshots = virDomainSnapshotListNames(domain->domain_, snapshots_, num_snapshots, flags);
+		if(num_snapshots == -1) {
+			free(snapshots_);
+			ThrowException(Error::New(virGetLastError()));
+			return Null();
+		}
+
+		Local<Array> snapshots = Array::New(num_snapshots);
+		for (int i = 0; i < num_snapshots; i++) {
+			virDomainSnapshotPtr snapshot = virDomainSnapshotLookupByName(domain->domain_, snapshots_[i], flags);
+			char *xml = virDomainSnapshotGetXMLDesc(snapshot, flags);
+			virDomainSnapshotFree(snapshot);
+
+			snapshots->Set(Integer::New(i), String::New(xml));
+			free(snapshots_[i]);
+			free(xml);
+		}
+		free(snapshots_);
+
+		return scope.Close(snapshots);
+	}
 
 } //namespace NodeLibvirt
 
