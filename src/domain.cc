@@ -129,6 +129,7 @@ namespace NodeLibvirt {
 		Hypervisor* hypervisor;
 		Domain* domain;
 	};
+
 	struct LookupDomainByNameBaton : BatonBase {
 		const char* name;
 		Hypervisor* hypervisor;
