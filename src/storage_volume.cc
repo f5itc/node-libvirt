@@ -26,6 +26,12 @@ namespace NodeLibvirt {
         int ret;
     };
 
+    struct GetInfoBaton : BatonBase {
+        unsigned int flags;
+        StorageVolume* volume;
+        virStorageVolInfo res;
+    };
+
     struct LookupByNameBaton : BatonBase {
         const char* name;
         StorageVolume* volume;
@@ -204,27 +210,96 @@ namespace NodeLibvirt {
         return True();
     }
 
+    void GetStorageVolumeInfoAsync(uv_work_t* req) {
+        GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
 
-    Handle<Value> StorageVolume::GetInfo(const Arguments& args) {
-        HandleScope scope;
+        StorageVolume *volume = baton->volume;
+
         virStorageVolInfo info;
+        virErrorPtr err;
+
         int ret = -1;
-
-        StorageVolume *volume = ObjectWrap::Unwrap<StorageVolume>(args.This());
-
         ret = virStorageVolGetInfo(volume->volume_, &info);
 
         if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+            err = virGetLastError();
+            baton->error = err->message;
         }
-        Local<Object> object = Object::New();
 
-        object->Set(info_type_symbol, Integer::New(info.type)); //virStoragePoolState
-        object->Set(info_capacity_symbol, Number::New(info.capacity)); //bytes
-        object->Set(info_allocation_symbol, Number::New(info.allocation)); //bytes
+        else {
+            baton->res = info;
+        }
+    }
 
-        return scope.Close(object);
+    void GetStorageVolumeInfoAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        GetInfoBaton* baton = static_cast<GetInfoBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        virStorageVolInfo res = baton->res;
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            Local<Object> object = Object::New();
+
+            // virStoragePoolState
+            object->Set(info_type_symbol, Integer::New(res.type));
+
+            // bytes
+            object->Set(info_capacity_symbol, Number::New(res.capacity));
+
+            // bytes
+            object->Set(info_allocation_symbol, Number::New(res.allocation));
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(object);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
+    Handle<Value> StorageVolume::GetInfo(const Arguments& args) {
+        HandleScope scope;
+
+        // Storage volume context
+        StorageVolume *volume = ObjectWrap::Unwrap<StorageVolume>(args.This());
+
+        // Callback
+        Local<Function> callback = Local<Function>::Cast(args[0]);
+
+        // Create baton
+        GetInfoBaton* baton = new GetInfoBaton();
+
+        // Add callback and storage volume
+        baton->callback = Persistent<Function>::New(callback);
+        baton->volume = volume;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            GetStorageVolumeInfoAsync,
+            (uv_after_work_cb)GetStorageVolumeInfoAsyncAfter
+        );
+
+        return Undefined();
     }
 
     Handle<Value> StorageVolume::GetKey(const Arguments& args) {
