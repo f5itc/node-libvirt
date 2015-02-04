@@ -98,6 +98,8 @@ namespace NodeLibvirt {
 
             friend void CreateDomainAsync(uv_work_t* req);
             friend void CreateDomainAsyncAfter(uv_work_t* req);
+            friend void LookupDomainByIdAsync(uv_work_t* req);
+            friend void LookupDomainByIdAsyncAfter(uv_work_t* req);
             friend void LookupDomainByNameAsync(uv_work_t* req);
             friend void LookupDomainByNameAsyncAfter(uv_work_t* req);
 

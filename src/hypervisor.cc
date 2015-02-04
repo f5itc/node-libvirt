@@ -111,7 +111,7 @@ namespace NodeLibvirt {
       virNodeInfo res;
     };
 
-    struct GetDomainCountBaton: HypervisorBaton { 
+    struct GetDomainCountBaton: HypervisorBaton {
       int res;
     };
 
@@ -326,6 +326,9 @@ namespace NodeLibvirt {
 
         NODE_SET_PROTOTYPE_METHOD(t, "lookupStorageVolumeByKey",
                                       StorageVolume::LookupByKey);
+
+        NODE_SET_PROTOTYPE_METHOD(t, "lookupStorageVolumeByName",
+                                      StorageVolume::LookupByName);
 
         NODE_SET_PROTOTYPE_METHOD(t, "lookupStorageVolumeByPath",
                                       StorageVolume::LookupByPath);
@@ -608,7 +611,7 @@ namespace NodeLibvirt {
             return ThrowException(Exception::TypeError(
             String::New("Interval must be a number")));
         }
-        
+
         if (!args[1]->IsNumber()) {
             return ThrowException(Exception::TypeError(
             String::New("Count must be a number")));

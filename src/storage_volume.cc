@@ -20,6 +20,12 @@ namespace NodeLibvirt {
         }
     };
 
+    struct DeleteBaton : BatonBase {
+        unsigned int flags;
+        StorageVolume* volume;
+        int ret;
+    };
+
     struct LookupByNameBaton : BatonBase {
         const char* name;
         StorageVolume* volume;
@@ -37,23 +43,23 @@ namespace NodeLibvirt {
 
         Local<FunctionTemplate> t = FunctionTemplate::New();
 
-//        t->Inherit(EventEmitter::constructor_template);
+        //        t->Inherit(EventEmitter::constructor_template);
         t->InstanceTemplate()->SetInternalFieldCount(1);
 
         NODE_SET_PROTOTYPE_METHOD(t, "getInfo",
-                                      StorageVolume::GetInfo);
+                StorageVolume::GetInfo);
         NODE_SET_PROTOTYPE_METHOD(t, "getKey",
-                                      StorageVolume::GetKey);
+                StorageVolume::GetKey);
         NODE_SET_PROTOTYPE_METHOD(t, "getName",
-                                      StorageVolume::GetName);
+                StorageVolume::GetName);
         NODE_SET_PROTOTYPE_METHOD(t, "getPath",
-                                      StorageVolume::GetPath);
+                StorageVolume::GetPath);
         NODE_SET_PROTOTYPE_METHOD(t, "toXml",
-                                      StorageVolume::ToXml);
+                StorageVolume::ToXml);
         NODE_SET_PROTOTYPE_METHOD(t, "remove",
-                                      StorageVolume::Delete);
+                StorageVolume::Delete);
         NODE_SET_PROTOTYPE_METHOD(t, "wipe",
-                                      StorageVolume::Wipe);
+                StorageVolume::Wipe);
 
         constructor_template = Persistent<FunctionTemplate>::New(t);
         constructor_template->SetClassName(String::NewSymbol("StorageVolume"));
@@ -78,19 +84,19 @@ namespace NodeLibvirt {
 
         if(argsl == 0) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify at least one argument")));
+                        String::New("You must specify at least one argument")));
         }
 
         if(!args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as first argument")));
+                        String::New("You must specify a string as first argument")));
         }
 
         Local<Object> pool_obj = args.This();
 
         if(!StoragePool::HasInstance(pool_obj)) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor object instance")));
+                        String::New("You must specify a Hypervisor object instance")));
         }
         String::Utf8Value xml(args[0]->ToString());
 
@@ -110,24 +116,76 @@ namespace NodeLibvirt {
         return scope.Close(volume_obj);
     }
 
+    void DeleteStorageVolAsync(uv_work_t* req) {
+        // re-baton the request data
+        DeleteBaton* baton = static_cast<DeleteBaton*>(req->data);
+        virErrorPtr err;
+
+        baton->ret  = virStorageVolDelete(baton->volume->volume_, baton->flags);
+
+        if(baton->ret == -1) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        if(baton->volume->volume_ != NULL) {
+            virStorageVolFree(baton->volume->volume_);
+        }
+    }
+
+    // err: virGetLastError
+    // result: return value from virStorageVolDelete
+    void DeleteStorageVolAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        DeleteBaton* baton = static_cast<DeleteBaton*>(req->data);
+        delete req;
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+        else {
+            argv[0] = Undefined();
+            argv[1] = True();
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
     Handle<Value> StorageVolume::Delete(const Arguments& args) {
         HandleScope scope;
         unsigned int flags = 0;
-        int ret = -1;
 
+        DeleteBaton* baton = new DeleteBaton();
+
+        Local<Function> callback = Local<Function>::Cast(args[0]);
         StorageVolume *volume = ObjectWrap::Unwrap<StorageVolume>(args.This());
 
-        ret = virStorageVolDelete(volume->volume_, flags);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+        baton->callback = Persistent<Function>::New(callback);
+        baton->flags = flags;
+        baton->volume = volume;
 
-        if(volume->volume_ != NULL) {
-            virStorageVolFree(volume->volume_);
-        }
+        // Compose request
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
 
-        return True();
+        // Dispatch work
+        uv_queue_work(
+                uv_default_loop(),
+                req,
+                DeleteStorageVolAsync,
+                (uv_after_work_cb)DeleteStorageVolAsyncAfter
+                );
+
+        return scope.Close(Undefined());
     }
 
     Handle<Value> StorageVolume::Wipe(const Arguments& args) {
@@ -283,10 +341,10 @@ namespace NodeLibvirt {
         TryCatch try_catch;
 
         if (try_catch.HasCaught())
-          FatalException(try_catch);
+            FatalException(try_catch);
 
         baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
-        delete baton; 
+        delete baton;
     }
 
     Handle<Value> StorageVolume::LookupByName(const Arguments& args) {
@@ -294,14 +352,14 @@ namespace NodeLibvirt {
 
         if(args.Length() == 0 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string to call this function")));
+                        String::New("You must specify a string to call this function")));
         }
 
         Local<Object> pool_obj = args.This();
 
         if(!StoragePool::HasInstance(pool_obj)) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a StoragePool instance")));
+                        String::New("You must specify a StoragePool instance")));
         }
 
         const char *name = parseString(args[0]);
@@ -325,11 +383,11 @@ namespace NodeLibvirt {
 
         // Dispatch work
         uv_queue_work(
-          uv_default_loop(),
-          req,
-          LookupByNameAsync,
-          (uv_after_work_cb)LookupByNameAsyncAfter
-        );
+                uv_default_loop(),
+                req,
+                LookupByNameAsync,
+                (uv_after_work_cb)LookupByNameAsyncAfter
+                );
 
         return scope.Close(Undefined());
     }
@@ -339,14 +397,14 @@ namespace NodeLibvirt {
 
         if(args.Length() == 0 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string to call this function")));
+                        String::New("You must specify a string to call this function")));
         }
 
         Local<Object> hyp_obj = args.This();
 
         if(!Hypervisor::HasInstance(hyp_obj)) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor instance")));
+                        String::New("You must specify a Hypervisor instance")));
         }
 
         String::Utf8Value key(args[0]->ToString());
@@ -415,7 +473,7 @@ namespace NodeLibvirt {
         TryCatch try_catch;
 
         if (try_catch.HasCaught())
-          FatalException(try_catch);
+            FatalException(try_catch);
 
         baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
         delete baton;
@@ -425,14 +483,14 @@ namespace NodeLibvirt {
 
         if(args.Length() == 0 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string to call this function")));
+                        String::New("You must specify a string to call this function")));
         }
 
         Local<Object> hyp_obj = args.This();
 
         if(!Hypervisor::HasInstance(hyp_obj)) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a Hypervisor instance")));
+                        String::New("You must specify a Hypervisor instance")));
         }
 
         const char *path = parseString(args[0]);
@@ -454,11 +512,11 @@ namespace NodeLibvirt {
 
         // Dispatch work
         uv_queue_work(
-          uv_default_loop(),
-          req,
-          LookupByPathAsync,
-          (uv_after_work_cb)LookupByPathAsyncAfter
-        );
+                uv_default_loop(),
+                req,
+                LookupByPathAsync,
+                (uv_after_work_cb)LookupByPathAsyncAfter
+                );
 
         return Undefined();
     }
@@ -469,24 +527,24 @@ namespace NodeLibvirt {
 
         if(args.Length() < 2) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify two arguments to call this function")));
+                        String::New("You must specify two arguments to call this function")));
         }
 
         if(!StorageVolume::HasInstance(args[0])) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a StorageVolume instance as first argument")));
+                        String::New("You must specify a StorageVolume instance as first argument")));
         }
 
         if(!args[1]->IsString()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as second argument")));
+                        String::New("You must specify a string as second argument")));
         }
 
         Local<Object> pool_obj = args.This();
 
         if(!StoragePool::HasInstance(pool_obj)) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a StoragePool instance")));
+                        String::New("You must specify a StoragePool instance")));
         }
 
         String::Utf8Value xml(args[1]->ToString());
@@ -496,9 +554,9 @@ namespace NodeLibvirt {
 
         StorageVolume *clone_volume = new StorageVolume();
         clone_volume->volume_ = virStorageVolCreateXMLFrom(pool->pool(),
-                                                          (const char *) *xml,
-                                                          source_volume->volume_,
-                                                          flags);
+                (const char *) *xml,
+                source_volume->volume_,
+                flags);
 
         if(clone_volume->volume_ == NULL) {
             ThrowException(Error::New(virGetLastError()));

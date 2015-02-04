@@ -21,6 +21,7 @@ namespace NodeLibvirt {
                 v8::Local<v8::Object> object = value->ToObject();
                 return constructor_template->HasInstance(object);
             }
+            virStorageVolPtr volume_;
 
         protected:
             static Handle<Value> Create(const Arguments& args);
@@ -41,11 +42,15 @@ namespace NodeLibvirt {
 
             static Handle<Value> LookupByUUID(const Arguments& args);
             static Handle<Value> Wipe(const Arguments& args);
+
             static Handle<Value> Delete(const Arguments& args);
+            friend void DeleteAsync(uv_work_t req);
+            friend void DeleteAsyncAfter(uv_work_t req);
+
             static Handle<Value> Clone(const Arguments& args);
 
         private:
-            virStorageVolPtr volume_;
+            //virStorageVolPtr volume_;
             static Persistent<FunctionTemplate> constructor_template;
     };
 
