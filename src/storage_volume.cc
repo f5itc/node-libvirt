@@ -166,7 +166,7 @@ namespace NodeLibvirt {
 
         DeleteBaton* baton = new DeleteBaton();
 
-        Local<Function> callback = Local<Function>::Cast(args[1]);
+        Local<Function> callback = Local<Function>::Cast(args[0]);
         StorageVolume *volume = ObjectWrap::Unwrap<StorageVolume>(args.This());
 
         baton->callback = Persistent<Function>::New(callback);
