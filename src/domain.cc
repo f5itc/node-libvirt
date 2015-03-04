@@ -1893,7 +1893,7 @@ namespace NodeLibvirt {
 		}
 
 		// Callback
-		Local<Function> callback = Local<Function>::Cast(args[3]);
+		Local<Function> callback = Local<Function>::Cast(args[2]);
 
 		// Domain context
 		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
@@ -2001,7 +2001,7 @@ namespace NodeLibvirt {
 		}
 
 		// Callback
-		Local<Function> callback = Local<Function>::Cast(args[3]);
+		Local<Function> callback = Local<Function>::Cast(args[2]);
 
 		// Domain context
 		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
