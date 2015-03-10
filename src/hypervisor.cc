@@ -183,6 +183,9 @@ namespace NodeLibvirt {
         NODE_SET_PROTOTYPE_METHOD(t, "getDomainCount",
                                       Hypervisor::GetDomainCount);
 
+        NODE_SET_PROTOTYPE_METHOD(t, "getActiveDomainNames",
+                                      Hypervisor::GetActiveDomainNames);
+
         NODE_SET_PROTOTYPE_METHOD(t, "getActiveDomains",
                                       Hypervisor::GetActiveDomains);
 
@@ -977,6 +980,45 @@ namespace NodeLibvirt {
 
       return Undefined();
     }
+
+    Handle<Value> Hypervisor::GetActiveDomainNames(const Arguments& args) {
+        HandleScope scope;
+
+        virDomainPtr *domains;
+        unsigned int flags = 0;
+
+        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
+
+        int ret = virConnectListAllDomains(hypervisor->conn_, &domains, flags);
+
+        if(ret < 0) {
+            ThrowException(Error::New(virGetLastError()));
+            return Null();
+        }
+
+        Local<Array> v8Array = Array::New();
+        Domain *domain = new Domain();
+
+        for(int i = 0; i < ret; i++) {
+            domain->domain_ = domains[i];
+
+            const char *name = NULL;
+            name = virDomainGetName(domain->domain_);
+
+            if(name == NULL) {
+                ThrowException(Error::New(virGetLastError()));
+                return Null();
+            }
+
+            v8Array->Set(Integer::New(i), String::New(name));
+            virDomainFree(domains[i]);
+        }
+
+        free(domain);
+        free(domains);
+        return scope.Close(v8Array);
+    }
+
 
     Handle<Value> Hypervisor::GetActiveDomains(const Arguments& args) {
         HandleScope scope;

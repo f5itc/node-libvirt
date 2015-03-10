@@ -55,6 +55,7 @@ namespace NodeLibvirt {
             static Handle<Value> GetDefinedNetworks(const Arguments& args);
             static Handle<Value> GetDefinedStoragePools(const Arguments& args);
             static Handle<Value> GetDomainCount(const Arguments& args);
+            static Handle<Value> GetActiveDomainNames(const Arguments& args);
             static Handle<Value> GetActiveDomains(const Arguments& args);
             static Handle<Value> GetActiveInterfaces(const Arguments& args);
             static Handle<Value> GetNetworkFilters(const Arguments& args);
