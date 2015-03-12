@@ -111,6 +111,26 @@ namespace NodeLibvirt {
     static Persistent<String> domain_event_graphics_phase_sym;
     static Persistent<String> domain_event_graphics_authscheme_sym;
 
+    struct HypervisorBaton {
+      v8::Persistent<v8::Function> callback;
+      std::string error;
+      Hypervisor* hypervisor;
+      virtual ~HypervisorBaton() {
+        callback.Dispose();
+      }
+    };
+
+    struct GetNodeFreeMemoryBaton : HypervisorBaton {
+      int long long res;
+    };
+
+    struct GetNodeInfoBaton : HypervisorBaton {
+      virNodeInfo res;
+    };
+
+    struct GetDomainCountBaton: HypervisorBaton {
+      int res;
+    };
 
     void Hypervisor::Initialize(Handle<Object> target) {
         HandleScope scope;
@@ -179,6 +199,9 @@ namespace NodeLibvirt {
 
         NODE_SET_PROTOTYPE_METHOD(t, "getDefinedStoragePools",
                                       Hypervisor::GetDefinedStoragePools);
+
+        NODE_SET_PROTOTYPE_METHOD(t, "getDomainCount",
+                                      Hypervisor::GetDomainCount);
 
         NODE_SET_PROTOTYPE_METHOD(t, "getActiveDomainNames",
                                       Hypervisor::GetActiveDomainNames);
@@ -933,6 +956,85 @@ namespace NodeLibvirt {
         return scope.Close(result);
     }
 
+    void GetDomainCountAsync(uv_work_t* req) {
+      GetDomainCountBaton* baton = static_cast<GetDomainCountBaton*>(req->data);
+
+      Hypervisor *hypervisor = baton->hypervisor;
+
+      int numDomains= -1;
+      virErrorPtr err;
+
+      numDomains = virConnectNumOfDomains(hypervisor->conn_);
+
+      if (numDomains == -1) {
+        err = virGetLastError();
+        baton->error = err->message;
+      }
+
+      else {
+        baton->res = numDomains;
+      }
+    }
+
+    void GetDomainCountAsyncAfter(uv_work_t* req) {
+      HandleScope scope;
+
+      GetDomainCountBaton* baton = static_cast<GetDomainCountBaton*>(req->data);
+      delete req;
+
+      Handle<Value> argv[2];
+
+      if (!baton->error.empty()) {
+        argv[0] = Exception::Error(String::New(baton->error.c_str()));
+        argv[1] = Undefined();
+      }
+
+      else {
+        int numDomains = baton->res;
+        argv[0] = Undefined();
+        argv[1] = scope.Close(Number::New(numDomains));
+      }
+
+      TryCatch try_catch;
+
+      if (try_catch.HasCaught())
+        FatalException(try_catch);
+
+      baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+      delete baton;
+    }
+
+    Handle<Value> Hypervisor::GetDomainCount(const Arguments& args) {
+      HandleScope scope;
+
+      // Hypervisor context
+      Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
+
+      // Callback
+      Local<Function> callback = Local<Function>::Cast(args[0]);
+
+      // Create baton
+      GetDomainCountBaton* baton = new GetDomainCountBaton();
+
+      // Add callback and hypervisor
+      baton->callback = Persistent<Function>::New(callback);
+      baton->hypervisor = hypervisor;
+
+      // Compose req
+      uv_work_t* req = new uv_work_t;
+      req->data = baton;
+
+      // Dispatch work
+      uv_queue_work(
+        uv_default_loop(),
+        req,
+        GetDomainCountAsync,
+        (uv_after_work_cb)GetDomainCountAsyncAfter
+      );
+
+      return Undefined();
+    }
+
     Handle<Value> Hypervisor::GetActiveDomainNames(const Arguments& args) {
         HandleScope scope;
 
@@ -1059,46 +1161,175 @@ namespace NodeLibvirt {
         return scope.Close(cells);
     }
 
+    void GetNodeFreeMemoryAsync(uv_work_t* req) {
+      GetNodeFreeMemoryBaton* baton = static_cast<GetNodeFreeMemoryBaton*>(req->data);
+
+      Hypervisor *hypervisor = baton->hypervisor;
+
+      unsigned long long memory = 0;
+      virErrorPtr err;
+
+      memory = virNodeGetFreeMemory(hypervisor->conn_);
+
+      if (memory == 0) {
+        err = virGetLastError();
+        baton->error = err->message;
+      }
+
+      else {
+        baton->res = memory;
+      }
+    }
+
+    void GetNodeFreeMemoryAsyncAfter(uv_work_t* req) {
+      HandleScope scope;
+
+      GetNodeFreeMemoryBaton* baton = static_cast<GetNodeFreeMemoryBaton*>(req->data);
+      delete req;
+
+      Handle<Value> argv[2];
+
+      if (!baton->error.empty()) {
+        argv[0] = Exception::Error(String::New(baton->error.c_str()));
+        argv[1] = Undefined();
+      }
+
+      else {
+        unsigned long long memory = baton->res;
+        argv[0] = Undefined();
+        argv[1] = scope.Close(Number::New(memory));
+      }
+
+      TryCatch try_catch;
+
+      if (try_catch.HasCaught())
+        FatalException(try_catch);
+
+      baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+      delete baton;
+    }
+
     Handle<Value> Hypervisor::GetNodeFreeMemory(const Arguments& args) {
-        HandleScope scope;
-        unsigned long long memory = 0;
+      HandleScope scope;
 
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
+      // Hypervisor context
+      Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
 
-        memory = virNodeGetFreeMemory(hypervisor->conn_);
+      // Callback
+      Local<Function> callback = Local<Function>::Cast(args[0]);
 
-        if(memory == 0) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+      // Create baton
+      GetNodeFreeMemoryBaton* baton = new GetNodeFreeMemoryBaton();
 
-        return scope.Close(Number::New(memory));
+      // Add callback and hypervisor
+      baton->callback = Persistent<Function>::New(callback);
+      baton->hypervisor = hypervisor;
+
+      // Compose req
+      uv_work_t* req = new uv_work_t;
+      req->data = baton;
+
+      // Dispatch work
+      uv_queue_work(
+        uv_default_loop(),
+        req,
+        GetNodeFreeMemoryAsync,
+        (uv_after_work_cb)GetNodeFreeMemoryAsyncAfter
+      );
+
+      return Undefined();
+    }
+
+    void GetNodeInfoAsync(uv_work_t* req) {
+      GetNodeInfoBaton* baton = static_cast<GetNodeInfoBaton*>(req->data);
+
+      Hypervisor *hypervisor = baton->hypervisor;
+
+      virNodeInfo info;
+      virErrorPtr err;
+
+      int ret = -1;
+
+      ret = virNodeGetInfo(hypervisor->conn_, &info);
+
+      if (ret == -1) {
+        err = virGetLastError();
+        baton->error = err->message;
+      }
+
+      else {
+        baton->res = info;
+      }
+    }
+
+    void GetNodeInfoAsyncAfter(uv_work_t* req) {
+      HandleScope scope;
+
+      GetNodeInfoBaton* baton = static_cast<GetNodeInfoBaton*>(req->data);
+      delete req;
+
+      Handle<Value> argv[2];
+
+      virNodeInfo res = baton->res;
+
+      if (!baton->error.empty()) {
+        argv[0] = Exception::Error(String::New(baton->error.c_str()));
+        argv[1] = Undefined();
+      }
+
+      else {
+        Local<Object> object = Object::New();
+        object->Set(node_info_model_symbol, String::New(res.model));
+        object->Set(node_info_memory_symbol, Number::New(res.memory));
+        object->Set(node_info_cpus_symbol, Integer::New(res.cpus));
+        object->Set(node_info_mhz_symbol, Integer::New(res.mhz));
+        object->Set(node_info_nodes_symbol, Integer::New(res.nodes));
+        object->Set(node_info_sockets_symbol, Integer::New(res.sockets));
+        object->Set(node_info_cores_symbol, Integer::New(res.cores));
+        object->Set(node_info_threads_symbol, Integer::New(res.threads));
+
+        argv[0] = Undefined();
+        argv[1] = scope.Close(object);
+      }
+
+      TryCatch try_catch;
+
+      if (try_catch.HasCaught())
+        FatalException(try_catch);
+
+      baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+      delete baton;
     }
 
     Handle<Value> Hypervisor::GetNodeInfo(const Arguments& args) {
-        HandleScope scope;
-        virNodeInfo info_;
-        int ret = -1;
+      HandleScope scope;
 
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
-        ret = virNodeGetInfo(hypervisor->conn_, &info_);
+      // Hypervisor context
+      Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+      // Callback
+      Local<Function> callback = Local<Function>::Cast(args[0]);
 
-        Local<Object> info = Object::New();
-        info->Set(node_info_model_symbol, String::New(info_.model));
-        info->Set(node_info_memory_symbol, Number::New(info_.memory));
-        info->Set(node_info_cpus_symbol, Integer::New(info_.cpus));
-        info->Set(node_info_mhz_symbol, Integer::New(info_.mhz));
-        info->Set(node_info_nodes_symbol, Integer::New(info_.nodes));
-        info->Set(node_info_sockets_symbol, Integer::New(info_.sockets));
-        info->Set(node_info_cores_symbol, Integer::New(info_.cores));
-        info->Set(node_info_threads_symbol, Integer::New(info_.threads));
+      // Create baton
+      GetNodeInfoBaton* baton = new GetNodeInfoBaton();
 
-        return scope.Close(info);
+      // Add callback and hypervisor
+      baton->callback = Persistent<Function>::New(callback);
+      baton->hypervisor = hypervisor;
+
+      // Compose req
+      uv_work_t* req = new uv_work_t;
+      req->data = baton;
+
+      // Dispatch work
+      uv_queue_work(
+        uv_default_loop(),
+        req,
+        GetNodeInfoAsync,
+        (uv_after_work_cb)GetNodeInfoAsyncAfter
+      );
+
+      return Undefined();
     }
 
     Handle<Value> Hypervisor::GetNodeDevicesNames(const Arguments& args) {

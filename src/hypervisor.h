@@ -58,6 +58,7 @@ namespace NodeLibvirt {
             static Handle<Value> GetDefinedInterfaces(const Arguments& args);
             static Handle<Value> GetDefinedNetworks(const Arguments& args);
             static Handle<Value> GetDefinedStoragePools(const Arguments& args);
+            static Handle<Value> GetDomainCount(const Arguments& args);
             static Handle<Value> GetActiveDomainNames(const Arguments& args);
             static Handle<Value> GetActiveDomains(const Arguments& args);
             static Handle<Value> GetActiveInterfaces(const Arguments& args);
@@ -91,6 +92,14 @@ namespace NodeLibvirt {
 
             //Misc functions
             static Handle<Value> FindStoragePoolSources(const Arguments& args);
+
+            //Async functions
+            friend void GetDomainCountAsync(uv_work_t* req);
+            friend void GetDomainCountAsyncAfter(uv_work_t* req);
+            friend void GetNodeFreeMemoryAsync(uv_work_t* req);
+            friend void GetNodeFreeMemoryAsyncAfter(uv_work_t* req);
+            friend void GetNodeInfoAsync(uv_work_t* req);
+            friend void GetNodeInfoAsyncAfter(uv_work_t* req);
 
             Hypervisor( char* uri,
                         char* user,
