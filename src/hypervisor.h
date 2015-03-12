@@ -13,11 +13,14 @@
 #include "storage_pool.h"
 #include "storage_volume.h"
 #include "error.h"
+#include "worker.h"
 #include <string>
 
 namespace NodeLibvirt {
 
     class Hypervisor : public ObjectWrap {
+        friend class ConnectWorker;
+
         public:
             static void Initialize(Handle<Object> target);
             static inline bool HasInstance(v8::Handle<v8::Value> value) {
@@ -33,7 +36,8 @@ namespace NodeLibvirt {
         protected:
             static Handle<Value> New(const Arguments& args);
 
-            static Handle<Value> GetCapabilities(const Arguments& args);
+            static NAN_METHOD(Connect);
+            static NAN_METHOD(GetCapabilities);
             static Handle<Value> GetHostname(const Arguments& args);
             static Handle<Value> GetSysinfo(const Arguments& args);
             static Handle<Value> GetType(const Arguments& args);
@@ -54,7 +58,6 @@ namespace NodeLibvirt {
             static Handle<Value> GetDefinedInterfaces(const Arguments& args);
             static Handle<Value> GetDefinedNetworks(const Arguments& args);
             static Handle<Value> GetDefinedStoragePools(const Arguments& args);
-            static Handle<Value> GetDomainCount(const Arguments& args);
             static Handle<Value> GetActiveDomainNames(const Arguments& args);
             static Handle<Value> GetActiveDomains(const Arguments& args);
             static Handle<Value> GetActiveInterfaces(const Arguments& args);
@@ -89,24 +92,20 @@ namespace NodeLibvirt {
             //Misc functions
             static Handle<Value> FindStoragePoolSources(const Arguments& args);
 
-            //Async functions
-            friend void GetDomainCountAsync(uv_work_t* req);
-            friend void GetDomainCountAsyncAfter(uv_work_t* req);
-            friend void GetNodeFreeMemoryAsync(uv_work_t* req);
-            friend void GetNodeFreeMemoryAsyncAfter(uv_work_t* req);
-            friend void GetNodeInfoAsync(uv_work_t* req);
-            friend void GetNodeInfoAsyncAfter(uv_work_t* req);
-
             Hypervisor( char* uri,
                         char* user,
                         char* pass,
                         bool readOnly);
 
 
-        private:
+        protected:
             virConnectPtr conn_;
+            char* uri_;
             char* username_;
             char* password_;
+            bool readOnly_;
+
+        private:
 
             static void domain_event_free(void *opaque);
             static int domain_event_lifecycle_callback( virConnectPtr conn,
@@ -151,7 +150,23 @@ namespace NodeLibvirt {
                                         void *data);
     };
 
+    class ConnectWorker : public LibvirtWorker {
+        public:
+            ConnectWorker(NanCallback *callback, Hypervisor *hypervisor)
+                : LibvirtWorker(callback, NULL), hypervisor_(hypervisor) {}
+            void Execute();
+            static int auth_callback(virConnectCredentialPtr cred, unsigned int ncred, void *data);
+        private:
+            Hypervisor *hypervisor_;
+    };
+
+    class GetCapabilitiesWorker : public StringReturnWorker<LibvirtWorker, virConnectPtr> {
+        public:
+            GetCapabilitiesWorker(NanCallback *callback, virConnectPtr conn)
+                : StringReturnWorker(callback, conn) {}
+            void Execute();
+    };
+
 }  // namespace NodeLibvirt
 
 #endif  // SRC_HYPERVISOR_H_
-
