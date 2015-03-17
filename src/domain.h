@@ -95,6 +95,7 @@ namespace NodeLibvirt {
             static Handle<Value> DeleteSnapshot(const Arguments& args);
             static Handle<Value> LookupSnapshotByName(const Arguments& args);
             static Handle<Value> GetSnapshots(const Arguments& args);
+            static Handle<Value> SetTime(const Arguments& args);
 
             friend void CreateDomainAsync(uv_work_t* req);
             friend void CreateDomainAsyncAfter(uv_work_t* req);
@@ -102,6 +103,8 @@ namespace NodeLibvirt {
             friend void LookupDomainByIdAsyncAfter(uv_work_t* req);
             friend void LookupDomainByNameAsync(uv_work_t* req);
             friend void LookupDomainByNameAsyncAfter(uv_work_t* req);
+            friend void SetTimeAsync(uv_work_t* req);
+            friend void SetTimeAsyncAfter(uv_work_t* req);
 
         private:
             //virDomainPtr domain_;

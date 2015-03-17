@@ -143,6 +143,13 @@ namespace NodeLibvirt {
 		unsigned int revertflags;
 	};
 
+  struct SetTimeBaton : BatonBase {
+    int ret;
+    long long seconds;
+    unsigned int nseconds;
+    unsigned int flags;
+  };
+
 	struct SuspendBaton : BatonBase {
 		int res;
 	};
@@ -251,6 +258,8 @@ namespace NodeLibvirt {
 				Domain::Resume);
 		NODE_SET_PROTOTYPE_METHOD(t, "save",
 				Domain::Save);
+    NODE_SET_PROTOTYPE_METHOD(t, "setTime",
+        Domain::SetTime);
 		NODE_SET_PROTOTYPE_METHOD(t, "shutdown",
 				Domain::Shutdown);
 		NODE_SET_PROTOTYPE_METHOD(t, "start",
@@ -1611,7 +1620,100 @@ namespace NodeLibvirt {
 		return True();
 	}
 
-	Handle<Value> Domain::Migrate(const Arguments& args) {
+  void SetTimeAsync(uv_work_t* req) {
+    SetTimeBaton* baton = static_cast<SetTimeBaton*>(req->data);
+    Domain *domain = baton->domain;
+    long long seconds = baton->seconds;
+    unsigned int nseconds = baton->nseconds;
+    unsigned int flags = baton->flags;
+    virErrorPtr err;
+
+    int ret = -1;
+    ret = virDomainSetTime(domain->domain_, seconds, nseconds, flags);
+
+    if (ret == -1) {
+      err = virGetLastError();
+      baton->error = err->message;
+    }
+
+    baton->ret = ret;
+  }
+
+  void SetTimeAsyncAfter(uv_work_t* req) {
+    HandleScope scope;
+
+    SetTimeBaton* baton = static_cast<SetTimeBaton*>(req->data);
+    delete req;
+
+    Handle<Value> argv[2];
+
+    if (!baton->error.empty()) {
+      argv[0] =Exception::Error(String::New(baton->error.c_str()));
+      argv[1] = Undefined();
+    }
+
+    else {
+      argv[0] = Undefined();
+      argv[1] = scope.Close(True());
+    }
+
+    TryCatch try_catch;
+
+    if (try_catch.HasCaught())
+      FatalException(try_catch);
+
+    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    delete baton;
+  }
+
+  Handle<Value> Domain::SetTime(const Arguments& args) {
+    HandleScope scope;
+
+    SetTimeBaton* baton = new SetTimeBaton();
+    Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+    long long seconds = 0;
+    unsigned int nseconds = 0;
+    unsigned int flags = 0;
+    int ret = -1;
+
+    if (args.Length() == 0) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify arguments to invoke this function")));
+    }
+
+    if(!args[0]->IsInt32() || !args[1]->IsInt32() || !args[2]->IsInt32()) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify the seconds, nanoseconds, and flags as numbers.")));
+    }
+
+    // Callback
+    Local<Function> callback = Local<Function>::Cast(args[3]);
+
+    // Add data
+    baton->domain = domain;
+    baton->callback = Persistent<Function>::New(callback);
+    baton->seconds = seconds;
+    baton->nseconds = nseconds;
+    baton->flags = flags;
+    baton->ret = ret;
+
+    // Compose request
+    uv_work_t* req = new uv_work_t;
+    req->data = baton;
+
+    // Dispatch work
+    uv_queue_work(
+        uv_default_loop(),
+        req,
+        SetTimeAsync,
+        (uv_after_work_cb)SetTimeAsyncAfter
+        );
+
+    return scope.Close(Undefined());
+  }
+
+  Handle<Value> Domain::Migrate(const Arguments& args) {
 		HandleScope scope;
 		unsigned long flags = 0;
 		unsigned long bandwidth = 0;
