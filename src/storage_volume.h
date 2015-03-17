@@ -25,6 +25,9 @@ namespace NodeLibvirt {
 
         protected:
             static Handle<Value> Create(const Arguments& args);
+            friend void CreateStorageVolumeAsync(uv_work_t* req);
+            friend void CreateStorageVolumeAsyncAfter(uv_work_t* req);
+
             static Handle<Value> GetInfo(const Arguments& args);
             static Handle<Value> GetKey(const Arguments& args);
             static Handle<Value> GetName(const Arguments& args);

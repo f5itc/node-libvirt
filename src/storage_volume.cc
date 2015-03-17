@@ -20,6 +20,13 @@ namespace NodeLibvirt {
         }
     };
 
+    struct CreateStorageVolumeBaton : BatonBase {
+        StoragePool* pool;
+        const char* xml;
+        unsigned int flags;
+        StorageVolume* volume;
+    };
+
     struct DeleteBaton : BatonBase {
         unsigned int flags;
         StorageVolume* volume;
@@ -82,13 +89,65 @@ namespace NodeLibvirt {
         info_allocation_symbol   = NODE_PSYMBOL("allocation");
     }
 
+    void CreateStorageVolumeAsync(uv_work_t* req) {
+
+        CreateStorageVolumeBaton* baton = static_cast<CreateStorageVolumeBaton*>(req->data);
+        const char *xml = baton->xml;
+        unsigned int flags = baton->flags;
+        StoragePool *pool = baton->pool;
+
+        virErrorPtr err;
+        StorageVolume *volume = new StorageVolume();
+
+        volume->volume_ = virStorageVolCreateXML(pool->pool(), xml, flags);
+
+        if(volume->volume_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->volume = volume;
+        }
+    }
+
+    void CreateStorageVolumeAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        CreateStorageVolumeBaton* baton = static_cast<CreateStorageVolumeBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            StorageVolume *volume = baton->volume;
+            Local<Object> vol_obj = volume->constructor_template->GetFunction()->NewInstance();
+            volume->Wrap(vol_obj);
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(vol_obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+          FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton;
+    }
+
     Handle<Value> StorageVolume::Create(const Arguments& args) {
+
         HandleScope scope;
         unsigned int flags = 0;
 
-        int argsl = args.Length();
-
-        if(argsl == 0) {
+        if(args.Length() == 0) {
             return ThrowException(Exception::TypeError(
                         String::New("You must specify at least one argument")));
         }
@@ -98,28 +157,51 @@ namespace NodeLibvirt {
                         String::New("You must specify a string as first argument")));
         }
 
+        if (args.Length() > 1 && !args[1]->IsArray()) {
+            return ThrowException(Exception::TypeError(
+                        String::New("Second argument, if specified, must be an array")));
+        }
+
+        // Flags
+        Local<Array> flags_ = Local<Array>::Cast(args[1]);
+
+        for (unsigned int i = 0; i < flags_->Length(); i++) {
+          flags |= flags_->Get(Integer::New(i))->Int32Value();
+        }
+
         Local<Object> pool_obj = args.This();
 
         if(!StoragePool::HasInstance(pool_obj)) {
             return ThrowException(Exception::TypeError(
                         String::New("You must specify a Hypervisor object instance")));
         }
-        String::Utf8Value xml(args[0]->ToString());
 
+        // args
         StoragePool *pool = ObjectWrap::Unwrap<StoragePool>(pool_obj);
+        const char * xml = parseString(args[0]);
+        Local<Function> callback = Local<Function>::Cast(args[2]);
 
-        StorageVolume *volume = new StorageVolume();
-        volume->volume_ = virStorageVolCreateXML(pool->pool(), (const char *) *xml, flags);
+        // Build baton
+        CreateStorageVolumeBaton* baton = new CreateStorageVolumeBaton();
 
-        if(volume->volume_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        baton->pool = pool;
+        baton->xml = xml;
+        baton->flags = flags;
+        baton->callback = Persistent<Function>::New(callback);
 
-        Local<Object> volume_obj = volume->constructor_template->GetFunction()->NewInstance();
-        volume->Wrap(volume_obj);
+        // Compose req
+        uv_work_t* req = new uv_work_t();
+        req->data = baton;
 
-        return scope.Close(volume_obj);
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            CreateStorageVolumeAsync,
+            (uv_after_work_cb)CreateStorageVolumeAsyncAfter
+        );
+
+        return scope.Close(Undefined());
     }
 
     void DeleteStorageVolAsync(uv_work_t* req) {

@@ -97,8 +97,7 @@ namespace NodeLibvirt {
 		const char* xml;
 		unsigned int flags;
 		Hypervisor* hypervisor;
-		Domain* domain;
-	};
+  };
 
 	struct DetachDeviceBaton : BatonBase {
 		const char* xml;
@@ -127,14 +126,12 @@ namespace NodeLibvirt {
 	struct LookupDomainByIdBaton : BatonBase {
 		int id;
 		Hypervisor* hypervisor;
-		Domain* domain;
 	};
 
 	struct LookupDomainByNameBaton : BatonBase {
 		const char* name;
 		Hypervisor* hypervisor;
-		Domain* domain;
-	};
+  };
 
 	struct ResumeBaton : BatonBase {
 		int res;

@@ -1,6 +1,7 @@
 // Copyright 2010, Camilo Aguilar. Cloudescape, LLC.
 #include <stdlib.h>
 #include "storage_pool.h"
+
 //FIXME default params, default flags
 
 namespace NodeLibvirt {
@@ -11,6 +12,17 @@ namespace NodeLibvirt {
     static Persistent<String> info_capacity_symbol;
     static Persistent<String> info_allocation_symbol;
     static Persistent<String> info_available_symbol;
+
+    struct BatonBase {
+      v8::Persistent<v8::Function> callback;
+      std::string error;
+      StoragePool* pool;
+    };
+
+    struct RefreshBaton : BatonBase {
+      unsigned int flags;
+      int ret;
+    };
 
     void StoragePool::Initialize() {
         HandleScope scope;
@@ -560,21 +572,77 @@ namespace NodeLibvirt {
         return scope.Close(volumes);
     }
 
+    void RefreshAsync(uv_work_t* req) {
+      RefreshBaton* baton = static_cast<RefreshBaton*>(req->data);
+
+      StoragePool* pool = baton->pool;
+      unsigned int flags = baton->flags;
+      int ret = -1;
+      virErrorPtr err;
+
+      ret = virStoragePoolRefresh(pool->pool_, flags);
+
+      if(ret == -1) {
+        err = virGetLastError();
+        baton->error = err->message;
+      }
+
+      baton->ret = ret;
+
+    }
+
+    void RefreshAsyncAfter(uv_work_t* req) {
+      HandleScope scope;
+
+      RefreshBaton* baton = static_cast<RefreshBaton*>(req->data);
+      delete req;
+
+      Handle<Value> argv[2];
+
+      if (!baton->error.empty()) {
+        argv[0] = Exception::Error(String::New(baton->error.c_str()));
+        argv[1] = Undefined();
+      }
+
+      else {
+        argv[0] = Undefined();
+        argv[1] = scope.Close(True());
+      }
+
+      TryCatch try_catch;
+
+      if (try_catch.HasCaught())
+        FatalException(try_catch);
+
+      baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+      delete baton;
+    }
+
     Handle<Value> StoragePool::Refresh(const Arguments& args) {
         HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
 
+        // args
         StoragePool *pool = ObjectWrap::Unwrap<StoragePool>(args.This());
+        Local<Function> callback = Local<Function>::Cast(args[0]);
 
-        ret = virStoragePoolRefresh(pool->pool_, flags);
+        RefreshBaton* baton = new RefreshBaton();
+        baton->pool = pool;
+        baton->flags = 0;
+        baton->callback = Persistent<Function>::New(callback);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
+        // Compose request
+        uv_work_t* req = new uv_work_t();
+        req->data = baton;
 
-        return True();
+        // Dispach work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            RefreshAsync,
+            (uv_after_work_cb)RefreshAsyncAfter
+        );
+
+        return scope.Close(Undefined());
     }
 
 } //namespace NodeLibvirt
