@@ -822,10 +822,17 @@ namespace NodeLibvirt {
        return False();
     }
 
-    Handle<Value> Hypervisor::IsConnectionAlive(const Arguments& args) {
+    NAN_METHOD(Hypervisor::IsConnectionAlive) {
         HandleScope scope;
 
-        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
+        Local<Object> hyp_obj = args.This();
+
+        if(!Hypervisor::HasInstance(hyp_obj)) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a Hypervisor object instance")));
+        }
+
+        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
 
         int ret = virConnectIsAlive(hypervisor->conn_);
 
