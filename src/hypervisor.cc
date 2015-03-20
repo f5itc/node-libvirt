@@ -6,54 +6,71 @@
 
 #define GET_LIST_OF(name, numof_function, list_function)                    \
                                                                             \
-Handle<Value> Hypervisor::name(const Arguments& args) {                     \
-    HandleScope scope;                                                      \
-    char **_names = NULL;                                                   \
-    int numInactiveItems;                                                   \
-    virConnectPtr connection;                                               \
+NAN_METHOD(Hypervisor::name) {                                              \
+    NanScope();                                                             \
                                                                             \
     Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());   \
-    connection = hypervisor->conn_;                                         \
                                                                             \
-    numInactiveItems = numof_function(connection);                          \
-                                                                            \
-    if(numInactiveItems == -1) {                                            \
-        ThrowException(Error::New(virGetLastError()));                      \
-        return Null();                                                      \
+    if (args.Length() == 1 && !args[0]->IsFunction()) {                     \
+        return ThrowException(Exception::TypeError(                         \
+        String::New("You must specify a function as first argument")));     \
     }                                                                       \
                                                                             \
-    _names = (char **)malloc(sizeof(*_names) * numInactiveItems);           \
-    if(_names == NULL) {                                                    \
-        LIBVIRT_THROW_EXCEPTION("unable to allocate memory");               \
-        return Null();                                                      \
-    }                                                                       \
+    NanCallback *callback = new NanCallback(args[0].As<Function>());        \
                                                                             \
-    int ret = list_function(connection, _names, numInactiveItems);          \
+    NanAsyncQueueWorker(                                                    \
+        new GetListOfWorker(                                                \
+            callback,                                                       \
+            hypervisor->conn_,                                              \
+            numof_function,                                                 \
+            list_function)                                                  \
+    );                                                                      \
                                                                             \
-    if(ret == -1) {                                                         \
-        ThrowException(Error::New(virGetLastError()));                      \
-        free(_names);                                                       \
-        return Null();                                                      \
-    }                                                                       \
-                                                                            \
-    TO_V8_ARRAY(numInactiveItems, _names);                                  \
+    NanReturnUndefined();                                                   \
 }
-
 
 #define GET_NUM_OF(name, function)                                          \
                                                                             \
-Handle<Value> Hypervisor::name(const Arguments& args) {                     \
-    HandleScope scope;                                                      \
-    Hypervisor *hypervisor =                                                \
-    ObjectWrap::Unwrap<Hypervisor>(args.This());                            \
+NAN_METHOD(Hypervisor::name) {                                              \
+    NanScope();                                                             \
                                                                             \
-    int ret = function(hypervisor->conn_);                                  \
-    if(ret == -1) {                                                         \
-        ThrowException(Error::New(virGetLastError()));                      \
-        return Null();                                                      \
+    Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());   \
+                                                                            \
+    if (args.Length() == 1 && !args[0]->IsFunction()) {                     \
+        return ThrowException(Exception::TypeError(                         \
+        String::New("You must specify a function as first argument")));     \
     }                                                                       \
-    return scope.Close(Integer::New(ret));                                  \
-}                                                                           \
+                                                                            \
+    NanCallback *callback = new NanCallback(args[0].As<Function>());        \
+                                                                            \
+    NanAsyncQueueWorker(                                                    \
+        new GetNumOfWorker(                                                 \
+            callback,                                                       \
+            hypervisor->conn_,                                              \
+            function)                                                       \
+    );                                                                      \
+                                                                            \
+    NanReturnUndefined();                                                   \
+}
+
+#define NOARGS_WORKER_METHOD(name, worker)                                  \
+                                                                            \
+NAN_METHOD(Hypervisor::name) {                                                          \
+  NanScope();                                                               \
+                                                                            \
+  Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());     \
+                                                                            \
+  if (args.Length() == 1 && !args[0]->IsFunction()) {                       \
+    return ThrowException(Exception::TypeError(                             \
+    String::New("You must specify a function as first argument")));         \
+  }                                                                         \
+                                                                            \
+  NanCallback *callback = new NanCallback(args[0].As<Function>());          \
+                                                                            \
+  NanAsyncQueueWorker(new worker(callback, hypervisor->conn_));             \
+                                                                            \
+  NanReturnUndefined();                                                     \
+}
 
 namespace NodeLibvirt {
 
@@ -118,10 +135,13 @@ namespace NodeLibvirt {
     void Hypervisor::Initialize(Handle<Object> target) {
         HandleScope scope;
 
-//        t->Inherit(EventEmitter::constructor_template);
         Local<FunctionTemplate> t = FunctionTemplate::New(New);
 
+//        t->Inherit(EventEmitter::constructor_template);
         t->InstanceTemplate()->SetInternalFieldCount(1);
+
+        NODE_SET_PROTOTYPE_METHOD(t, "connect",
+                                      Hypervisor::Connect);
 
         NODE_SET_PROTOTYPE_METHOD(t, "getBaselineCPU",
                                       Hypervisor::GetBaselineCPU);
@@ -182,6 +202,9 @@ namespace NodeLibvirt {
 
         NODE_SET_PROTOTYPE_METHOD(t, "getDomainCount",
                                       Hypervisor::GetDomainCount);
+
+        NODE_SET_PROTOTYPE_METHOD(t, "getActiveDomainNames",
+                                      Hypervisor::GetActiveDomainNames);
 
         NODE_SET_PROTOTYPE_METHOD(t, "getActiveDomains",
                                       Hypervisor::GetActiveDomains);
@@ -327,9 +350,6 @@ namespace NodeLibvirt {
         NODE_SET_PROTOTYPE_METHOD(t, "lookupStorageVolumeByKey",
                                       StorageVolume::LookupByKey);
 
-        NODE_SET_PROTOTYPE_METHOD(t, "lookupStorageVolumeByName",
-                                      StorageVolume::LookupByName);
-
         NODE_SET_PROTOTYPE_METHOD(t, "lookupStorageVolumeByPath",
                                       StorageVolume::LookupByPath);
 
@@ -362,13 +382,6 @@ namespace NodeLibvirt {
         //virSecretUsageType
         NODE_DEFINE_CONSTANT(object_tmpl, VIR_SECRET_USAGE_TYPE_NONE);
         NODE_DEFINE_CONSTANT(object_tmpl, VIR_SECRET_USAGE_TYPE_VOLUME);
-
-        //virDomainCreateFlags
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_NONE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_PAUSED);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_AUTODESTROY);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_BYPASS_CACHE);
-        NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_START_FORCE_BOOT);
 
         //virDomainEventID
         NODE_DEFINE_CONSTANT(object_tmpl, VIR_DOMAIN_EVENT_ID_LIFECYCLE);
@@ -432,27 +445,11 @@ namespace NodeLibvirt {
                             bool readonly)
     : ObjectWrap() {
 
-        static int supported_cred_types[] = {
-            VIR_CRED_AUTHNAME,
-            VIR_CRED_PASSPHRASE,
-        };
-
+        this->uri_ = uri;
         this->username_ = username;
         this->password_ = password;
+        this->readOnly_ = readonly;
 
-        virConnectAuth auth;
-        auth.credtype = supported_cred_types;
-        auth.ncredtype = sizeof(supported_cred_types)/sizeof(int);
-        auth.cb = Hypervisor::auth_callback;
-        auth.cbdata = this;
-
-        conn_ = virConnectOpenAuth( (const char*) uri,
-                                    &auth,
-                                    readonly ? VIR_CONNECT_RO : 0);
-
-        if(conn_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-        }
     }
 
     int Hypervisor::auth_callback(  virConnectCredentialPtr cred,
@@ -506,7 +503,7 @@ namespace NodeLibvirt {
 
         Local<String> uriStr = args[0]->ToString();
         String::Utf8Value uri_(uriStr);
-        uri = *uri_;
+        uri = strdup(*uri_);
 
         if (argsLen >= 2) {
             if (args[1]->IsBoolean()) {
@@ -542,24 +539,84 @@ namespace NodeLibvirt {
         return scope.Close(obj);
     }
 
-    Handle<Value> Hypervisor::GetCapabilities(const Arguments& args) {
-        HandleScope scope;
-        char* capabilities_ = NULL;
+    int ConnectWorker::auth_callback(  virConnectCredentialPtr cred,
+                                    unsigned int ncred,
+                                    void *data) {
+        ConnectWorker *worker = static_cast<ConnectWorker*>(data);
+
+        for (unsigned int i = 0; i < ncred; i++) {
+            if (cred[i].type == VIR_CRED_AUTHNAME) {
+                cred[i].result = worker->hypervisor_->username_;
+
+                if (cred[i].result == NULL) {
+                    return -1;
+                }
+                cred[i].resultlen = strlen(cred[i].result);
+            } else if (cred[i].type == VIR_CRED_PASSPHRASE) {
+                cred[i].result = worker->hypervisor_->password_;
+                if (cred[i].result == NULL) {
+                    return -1;
+                }
+                cred[i].resultlen = strlen(cred[i].result);
+            }
+        }
+
+        return 0;
+    }
+
+    void ConnectWorker::Execute() {
+
+      static int supported_cred_types[] = {
+          VIR_CRED_AUTHNAME,
+          VIR_CRED_PASSPHRASE,
+      };
+
+      virConnectAuth auth;
+      auth.credtype = supported_cred_types;
+      auth.ncredtype = sizeof(supported_cred_types)/sizeof(int);
+      auth.cb = ConnectWorker::auth_callback;
+      auth.cbdata = this;
+
+      hypervisor_->conn_ = virConnectOpenAuth( (const char*) hypervisor_->uri_,
+                                  &auth,
+                                  hypervisor_->readOnly_ ? VIR_CONNECT_RO : 0);
+
+      if(hypervisor_->conn_ == NULL) {
+          setVirError(virGetLastError());
+      }
+    }
+
+    NAN_METHOD(Hypervisor::Connect) {                                                          \
+        NanScope();
 
         Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
 
-        capabilities_ = virConnectGetCapabilities(hypervisor->conn_);
-
-        if(capabilities_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        if (args.Length() == 1 && !args[0]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as first argument")));
         }
 
-        Local<String> capabilities = String::New((const char*)capabilities_);
-        free(capabilities_);
+        NanCallback *callback = new NanCallback(args[0].As<Function>());
 
-        return scope.Close(capabilities);
+        NanAsyncQueueWorker(new ConnectWorker(callback, hypervisor));
+
+        NanReturnUndefined();
     }
+
+    void GetCapabilitiesWorker::Execute() {
+        char* capabilities_ = NULL;
+
+        capabilities_ = virConnectGetCapabilities(getConnection());
+
+        if(capabilities_ == NULL) {
+            setVirError(virGetLastError());
+            return;
+        }
+
+        setVal(capabilities_);
+    }
+
+    NOARGS_WORKER_METHOD(GetCapabilities, GetCapabilitiesWorker)
 
     Handle<Value> Hypervisor::GetHostname(const Arguments& args) {
         HandleScope scope;
@@ -983,6 +1040,44 @@ namespace NodeLibvirt {
       );
 
       return Undefined();
+    }
+
+    Handle<Value> Hypervisor::GetActiveDomainNames(const Arguments& args) {
+        HandleScope scope;
+
+        virDomainPtr *domains;
+        unsigned int flags = 0;
+
+        Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(args.This());
+
+        int ret = virConnectListAllDomains(hypervisor->conn_, &domains, flags);
+
+        if(ret < 0) {
+            ThrowException(Error::New(virGetLastError()));
+            return Null();
+        }
+
+        Local<Array> v8Array = Array::New();
+        Domain *domain = new Domain();
+
+        for(int i = 0; i < ret; i++) {
+            domain->domain_ = domains[i];
+
+            const char *name = NULL;
+            name = virDomainGetName(domain->domain_);
+
+            if(name == NULL) {
+                ThrowException(Error::New(virGetLastError()));
+                return Null();
+            }
+
+            v8Array->Set(Integer::New(i), String::New(name));
+            virDomainFree(domains[i]);
+        }
+
+        free(domain);
+        free(domains);
+        return scope.Close(v8Array);
     }
 
     Handle<Value> Hypervisor::GetActiveDomains(const Arguments& args) {
@@ -1842,4 +1937,3 @@ namespace NodeLibvirt {
     GET_NUM_OF(GetNumberOfActiveStoragePools, virConnectNumOfStoragePools);
 
 } //namespace NodeLibvirt
-

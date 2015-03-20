@@ -21,6 +21,7 @@ namespace NodeLibvirt {
                 return constructor_template->HasInstance(object);
             }
         virStoragePoolPtr pool() const;
+        virStoragePoolPtr pool_;
 
         protected:
             static Handle<Value> Build(const Arguments& args);
@@ -45,7 +46,6 @@ namespace NodeLibvirt {
             static Handle<Value> Refresh(const Arguments& args);
 
         private:
-            virStoragePoolPtr pool_;
             static Persistent<FunctionTemplate> constructor_template;
     };
 
