@@ -20,6 +20,14 @@ namespace NodeLibvirt {
         }
     };
 
+    struct CloneVolBaton : BatonBase {
+        StoragePool* pool;
+        unsigned int flags;
+        StorageVolume* source_volume;
+        StorageVolume* clone_volume;
+        const char* xml;
+    };
+
     struct CreateStorageVolumeBaton : BatonBase {
         StoragePool* pool;
         const char* xml;
@@ -673,18 +681,76 @@ namespace NodeLibvirt {
                 req,
                 LookupByPathAsync,
                 (uv_after_work_cb)LookupByPathAsyncAfter
-                );
+        );
 
         return Undefined();
+    }
+
+    void CloneVolAsync(uv_work_t* req) {
+        CloneVolBaton* baton = static_cast<CloneVolBaton*>(req->data);
+        const char *xml = baton->xml;
+        unsigned int flags = baton->flags;
+        StoragePool *pool = baton->pool;
+        StorageVolume *source_volume = baton->source_volume;
+
+        StorageVolume *clone_volume = new StorageVolume();
+        virErrorPtr err;
+
+        clone_volume->volume_ = virStorageVolCreateXMLFrom(
+            pool->pool(),
+            xml,
+            source_volume->volume_,
+            flags
+        );
+
+        if(clone_volume->volume_ == NULL) {
+            err = virGetLastError();
+            baton->error = err->message;
+        }
+
+        else {
+            baton->clone_volume = clone_volume;
+        }
+    }
+
+    void CloneVolAsyncAfter(uv_work_t* req) {
+        HandleScope scope;
+
+        CloneVolBaton* baton = static_cast<CloneVolBaton*>(req->data);
+        delete req;
+
+        Handle<Value> argv[2];
+
+        if (!baton->error.empty()) {
+            argv[0] = Exception::Error(String::New(baton->error.c_str()));
+            argv[1] = Undefined();
+        }
+
+        else {
+            StorageVolume *clone_volume = baton->clone_volume;
+            Local<Object> clone_vol_obj = clone_volume->constructor_template->GetFunction()->NewInstance();
+            clone_volume->Wrap(clone_vol_obj);
+
+            argv[0] = Undefined();
+            argv[1] = scope.Close(clone_vol_obj);
+        }
+
+        TryCatch try_catch;
+
+        if (try_catch.HasCaught())
+            FatalException(try_catch);
+
+        baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+        delete baton; 
     }
 
     Handle<Value> StorageVolume::Clone(const Arguments& args) {
         HandleScope scope;
         unsigned int flags = 0;
 
-        if(args.Length() < 2) {
+        if(args.Length() < 3) {
             return ThrowException(Exception::TypeError(
-                        String::New("You must specify two arguments to call this function")));
+                        String::New("You must specify three arguments to call this function")));
         }
 
         if(!StorageVolume::HasInstance(args[0])) {
@@ -692,10 +758,14 @@ namespace NodeLibvirt {
                         String::New("You must specify a StorageVolume instance as first argument")));
         }
 
+        StorageVolume *source_volume = ObjectWrap::Unwrap<StorageVolume>(args[0]->ToObject());
+
         if(!args[1]->IsString()) {
             return ThrowException(Exception::TypeError(
                         String::New("You must specify a string as second argument")));
         }
+
+        const char * xml = parseString(args[1]);
 
         Local<Object> pool_obj = args.This();
 
@@ -704,27 +774,39 @@ namespace NodeLibvirt {
                         String::New("You must specify a StoragePool instance")));
         }
 
-        String::Utf8Value xml(args[1]->ToString());
-
         StoragePool *pool = ObjectWrap::Unwrap<StoragePool>(pool_obj);
-        StorageVolume *source_volume = ObjectWrap::Unwrap<StorageVolume>(args[0]->ToObject());
 
-        StorageVolume *clone_volume = new StorageVolume();
-        clone_volume->volume_ = virStorageVolCreateXMLFrom(pool->pool(),
-                (const char *) *xml,
-                source_volume->volume_,
-                flags);
-
-        if(clone_volume->volume_ == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        if(!args[2]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+                        String::New("You must specify a callback function as third argument")));
         }
 
-        Local<Object> clone_vol_obj = clone_volume->constructor_template->GetFunction()->NewInstance();
+        Local<Function> callback = Local<Function>::Cast(args[2]);
 
-        clone_volume->Wrap(clone_vol_obj);
+        // Create baton and add data
+        CloneVolBaton* baton = new CloneVolBaton();
 
-        return scope.Close(clone_vol_obj);
+        // Callback
+        baton->callback = Persistent<Function>::New(callback);
+
+        baton->pool = pool;
+        baton->source_volume = source_volume;
+        baton->xml = xml;
+        baton->flags = flags;
+
+        // Compose req
+        uv_work_t* req = new uv_work_t;
+        req->data = baton;
+
+        // Dispatch work
+        uv_queue_work(
+            uv_default_loop(),
+            req,
+            CloneVolAsync,
+            (uv_after_work_cb)CloneVolAsyncAfter
+        );
+
+        return Undefined();
     }
 
 } //namespace NodeLibvirt

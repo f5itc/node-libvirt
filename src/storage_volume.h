@@ -51,6 +51,8 @@ namespace NodeLibvirt {
             friend void DeleteAsyncAfter(uv_work_t req);
 
             static Handle<Value> Clone(const Arguments& args);
+            friend void CloneVolAsync(uv_work_t* req);
+            friend void CloneVolAsyncAfter(uv_work_t* req);
 
         private:
             //virStorageVolPtr volume_;
