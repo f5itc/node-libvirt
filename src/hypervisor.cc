@@ -359,6 +359,13 @@ namespace NodeLibvirt {
         NODE_SET_PROTOTYPE_METHOD(t, "unregisterDomainEvent",
                                       Hypervisor::UnregisterDomainEvent);
 
+        NODE_SET_PROTOTYPE_METHOD(t, "getSaveImage",
+                                      Domain::GetSaveImageXml);
+
+        NODE_SET_PROTOTYPE_METHOD(t, "updateSaveImage",
+                                      Domain::UpdateSaveImageXml);
+
+
         Local<ObjectTemplate> object_tmpl = t->InstanceTemplate();
 
         //Constants initialization

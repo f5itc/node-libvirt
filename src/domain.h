@@ -30,8 +30,17 @@ namespace NodeLibvirt {
 
         protected:
             static Handle<Value> Create(const Arguments& args);
+            friend void CreateDomainAsync(uv_work_t* req);
+            friend void CreateDomainAsyncAfter(uv_work_t* req);
+
             static Handle<Value> LookupById(const Arguments& args);
+            friend void LookupDomainByIdAsync(uv_work_t* req);
+            friend void LookupDomainByIdAsyncAfter(uv_work_t* req);
+
             static Handle<Value> LookupByName(const Arguments& args);
+            friend void LookupDomainByNameAsync(uv_work_t* req);
+            friend void LookupDomainByNameAsyncAfter(uv_work_t* req);
+
             static Handle<Value> LookupByUUID(const Arguments& args);
             static Handle<Value> Define(const Arguments& args);
             static Handle<Value> Undefine(const Arguments& args);
@@ -95,16 +104,18 @@ namespace NodeLibvirt {
             static Handle<Value> DeleteSnapshot(const Arguments& args);
             static Handle<Value> LookupSnapshotByName(const Arguments& args);
             static Handle<Value> GetSnapshots(const Arguments& args);
-            static Handle<Value> SetTime(const Arguments& args);
 
-            friend void CreateDomainAsync(uv_work_t* req);
-            friend void CreateDomainAsyncAfter(uv_work_t* req);
-            friend void LookupDomainByIdAsync(uv_work_t* req);
-            friend void LookupDomainByIdAsyncAfter(uv_work_t* req);
-            friend void LookupDomainByNameAsync(uv_work_t* req);
-            friend void LookupDomainByNameAsyncAfter(uv_work_t* req);
+            static Handle<Value> SetTime(const Arguments& args);
             friend void SetTimeAsync(uv_work_t* req);
             friend void SetTimeAsyncAfter(uv_work_t* req);
+
+            static Handle<Value> GetSaveImageXml(const Arguments& args);
+            friend void GetSaveImageXmlAsync(uv_work_t* req);
+            friend void GetSaveImageXmlAsyncAfter(uv_work_t* req);
+
+            static Handle<Value> UpdateSaveImageXml(const Arguments& args);
+            friend void UpdateSaveImageXmlAsync(uv_work_t* req);
+            friend void UpdateSaveImageXmlAsyncAfter(uv_work_t* req);
 
         private:
             //virDomainPtr domain_;

@@ -114,6 +114,13 @@ namespace NodeLibvirt {
 		virDomainInfo res;
 	};
 
+  struct GetSaveImageXmlBaton : BatonBase {
+		Hypervisor* hypervisor;
+		const char* path;
+		unsigned int flags;
+		char* xml;
+  };
+
 	struct DeleteSnapshotBaton : BatonBase {
 		const char* name;
 		unsigned int flags;
@@ -130,6 +137,12 @@ namespace NodeLibvirt {
 
 	struct LookupDomainByNameBaton : BatonBase {
 		const char* name;
+		Hypervisor* hypervisor;
+  };
+
+	struct RestoreBaton : BatonBase {
+    int res;
+		const char* path;
 		Hypervisor* hypervisor;
   };
 
@@ -150,6 +163,11 @@ namespace NodeLibvirt {
     unsigned int flags;
   };
 
+	struct SaveBaton : BatonBase {
+		int res;
+		const char* path;
+	};
+
 	struct SuspendBaton : BatonBase {
 		int res;
 	};
@@ -163,6 +181,14 @@ namespace NodeLibvirt {
 		unsigned int flags;
 		char* xml;
 	};
+
+  struct UpdateSaveImageXmlBaton : BatonBase {
+		Hypervisor* hypervisor;
+		const char* path;
+		const char* xml;
+		unsigned int flags;
+		int res;
+  };
 
 	void Domain::Initialize() {
 		Local<FunctionTemplate> t = FunctionTemplate::New();
@@ -1256,36 +1282,145 @@ namespace NodeLibvirt {
 		return True();
 	}
 
+	void SaveAsync(uv_work_t* req) {
+		SaveBaton* baton = static_cast<SaveBaton*>(req->data);
+		Domain *domain = baton->domain;
+		const char *path = baton->path;
+		virErrorPtr err;
+
+		int ret = -1;
+		ret = virDomainSave(domain->domain_, path);
+
+		if(ret == -1) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		baton->res = ret;
+	}
+
+	void SaveAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		SaveBaton* baton = static_cast<SaveBaton*>(req->data);
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			argv[0] = Undefined();
+			argv[1] = scope.Close(True());
+		}
+
+		TryCatch try_catch;
+
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
 	Handle<Value> Domain::Save(const Arguments& args) {
 		HandleScope scope;
-		int ret = -1;
 
 		if(args.Length() == 0 || !args[0]->IsString()) {
 			return ThrowException(Exception::TypeError(
-						String::New("You must specify a string as function argument")));
+						String::New("You must specify the destination path string as the first argument")));
 		}
 
-		String::Utf8Value path(args[0]->ToString());
-
-		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-		ret = virDomainSave(domain->domain_, (const char *) *path);
-
-		if(ret == -1) {
-			ThrowException(Error::New(virGetLastError()));
-			return False();
+		if(args.Length() == 1 || !args[1]->IsFunction()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a callback function as the second argument")));
 		}
 
-		return True();
+    // Path string
+		const char *path = parseString(args[0]);
+
+    // Domain context
+    Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+    // Create baton
+    SaveBaton* baton = new SaveBaton();
+
+    // Callback
+    Local<Function> callback = Local<Function>::Cast(args[1]);
+    baton->callback = Persistent<Function>::New(callback);
+
+    // Add data
+    baton->domain = domain;
+    baton->path   = path;
+
+    // Compose req
+    uv_work_t* req = new uv_work_t;
+    req->data = baton;
+
+    uv_queue_work(
+        uv_default_loop(),
+        req,
+        SaveAsync,
+        (uv_after_work_cb)SaveAsyncAfter
+    );
+
+    return scope.Close(Undefined());
 	}
+
+  void RestoreAsync(uv_work_t* req) {
+    RestoreBaton* baton = static_cast<RestoreBaton*>(req->data);
+    Hypervisor *hypervisor = baton->hypervisor;
+    const char *path = baton->path;
+    virErrorPtr err;
+
+    int ret = -1;
+    ret = virDomainRestore(hypervisor->connection(), path);
+
+    if(ret == -1) {
+      err = virGetLastError();
+      baton->error = err->message;
+    }
+
+    baton->res = ret;
+  }
+
+  void RestoreAsyncAfter(uv_work_t* req) {
+    HandleScope scope;
+
+    RestoreBaton* baton = static_cast<RestoreBaton*>(req->data);
+    delete req;
+
+    Handle<Value> argv[2];
+
+    if (!baton->error.empty()) {
+      argv[0] = Exception::Error(String::New(baton->error.c_str()));
+      argv[1] = Undefined();
+    }
+
+    else {
+      argv[0] = Undefined();
+      argv[1] = scope.Close(True());
+    }
+
+    TryCatch try_catch;
+
+    if (try_catch.HasCaught())
+      FatalException(try_catch);
+
+    baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+    delete baton;
+  }
+
 
 	Handle<Value> Domain::Restore(const Arguments& args) {
 		HandleScope scope;
-		int ret = -1;
 
 		if(args.Length() == 0 || !args[0]->IsString()) {
 			return ThrowException(Exception::TypeError(
-						String::New("You must specify a string as function argument")));
+						String::New("You must specify a path string as the first argument")));
 		}
 
 		Local<Object> hyp_obj = args.This();
@@ -1295,18 +1430,40 @@ namespace NodeLibvirt {
 						String::New("You must specify a Hypervisor object instance")));
 		}
 
-		String::Utf8Value path(args[0]->ToString());
-
-		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
-
-		ret = virDomainRestore(hypervisor->connection(), (const char *) *path);
-
-		if(ret == -1) {
-			ThrowException(Error::New(virGetLastError()));
-			return False();
+		if(args.Length() == 1 || !args[1]->IsFunction()) {
+			return ThrowException(Exception::TypeError(
+						String::New("You must specify a callback function as the second argument")));
 		}
 
-		return True();
+    // Path string
+    const char *path = parseString(args[0]);
+
+    // Hypervisor context
+		Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+
+    // Create baton
+    RestoreBaton* baton = new RestoreBaton();
+
+    // Callback
+    Local<Function> callback = Local<Function>::Cast(args[1]);
+    baton->callback = Persistent<Function>::New(callback);
+
+    // Add data
+    baton->hypervisor = hypervisor;
+    baton->path = path;
+
+    // Compose req
+    uv_work_t* req = new uv_work_t;
+    req->data = baton;
+
+    uv_queue_work(
+        uv_default_loop(),
+        req,
+        RestoreAsync,
+        (uv_after_work_cb)RestoreAsyncAfter
+    );
+
+    return scope.Close(Undefined());
 	}
 
 	void SuspendAsync(uv_work_t* req) {
@@ -2333,12 +2490,12 @@ namespace NodeLibvirt {
 		req->data = baton;
 
 		// Dispatch work
-		uv_queue_work(
-				uv_default_loop(),
-				req,
-				ToXmlAsync,
-				(uv_after_work_cb)ToXmlAsyncAfter
-				);
+    uv_queue_work(
+      uv_default_loop(),
+      req,
+      ToXmlAsync,
+      (uv_after_work_cb)ToXmlAsyncAfter
+    );
 
 		return Undefined();
 	}
@@ -3602,50 +3759,6 @@ namespace NodeLibvirt {
 		return scope.Close(Undefined());
 	}
 
-	/*Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
-		HandleScope scope;
-		virDomainSnapshotPtr snapshot = NULL;
-		unsigned int flags = 0;
-
-		Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-		if(args.Length() > 0) {
-		if (!args[0]->IsString()) {
-		return ThrowException(Exception::TypeError(
-		String::New("First argument, if provided, must be a string to invoke this function")));
-		}
-
-		String::Utf8Value xml(args[0]->ToString());
-
-		if (args.Length() > 1) {
-		if (!args[1]->IsObject()) {
-		return ThrowException(Exception::TypeError(
-		String::New("Second argument, if provided, must be an object to invoke this function")));
-		}
-
-		Local<Array> flags_ = Local<Array>::Cast(args[1]);
-		unsigned int length = flags_->Length();
-
-		for (unsigned int i = 0; i < length; i++) {
-		flags |= flags_->Get(Integer::New(i))->Int32Value();
-		}
-		}
-
-		snapshot = virDomainSnapshotCreateXML(domain->domain_, (const char *) *xml, flags);
-
-		} else {
-		snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
-		}
-
-		if(snapshot == NULL) {
-		ThrowException(Error::New(virGetLastError()));
-		return False();
-		}
-		virDomainSnapshotFree(snapshot);
-
-		return True();
-		}*/
-
 	Handle<Value> Domain::GetCurrentSnapshot(const Arguments& args) {
 		HandleScope scope;
 		unsigned int flags = 0;
@@ -3780,12 +3893,12 @@ namespace NodeLibvirt {
 		uv_work_t* req = new uv_work_t;
 		req->data = baton;
 
-		uv_queue_work(
-				uv_default_loop(),
-				req,
-				DeleteSnapshotAsync,
-				(uv_after_work_cb)DeleteSnapshotAsyncAfter
-				);
+    uv_queue_work(
+      uv_default_loop(),
+      req,
+      DeleteSnapshotAsync,
+      (uv_after_work_cb)DeleteSnapshotAsyncAfter
+    );
 
 		return True();
 	}
@@ -3866,6 +3979,219 @@ namespace NodeLibvirt {
 
 		return scope.Close(snapshots);
 	}
+
+	void GetSaveImageXmlAsync(uv_work_t* req) {
+		GetSaveImageXmlBaton* baton = static_cast<GetSaveImageXmlBaton*>(req->data);
+
+		Hypervisor *hypervisor = baton->hypervisor;
+		unsigned int flags = baton->flags;
+    const char *path = baton->path;
+
+		virErrorPtr err;
+		char* xml_ = NULL;
+
+		xml_ = virDomainSaveImageGetXMLDesc(hypervisor->connection(), path, flags);
+
+		if(xml_ == NULL) {
+			err = virGetLastError();
+			baton->error = err->message;
+		}
+
+		else {
+			baton->xml = xml_;
+		}
+
+		free(xml_);
+	}
+
+	void GetSaveImageXmlAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		GetSaveImageXmlBaton* baton = static_cast<GetSaveImageXmlBaton*>(req->data);
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			argv[0] = Undefined();
+			argv[1] = String::New(baton->xml);
+		}
+
+		TryCatch try_catch;
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+  // file, flags, cb
+  Handle<Value> Domain::GetSaveImageXml(const Arguments& args) {
+    HandleScope scope;
+    unsigned int flags = 0;
+
+    if(args.Length() == 0 || !args[0]->IsString()) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify a path string as the first argument")));
+    }
+
+    Local<Object> hyp_obj = args.This();
+
+    if(!Hypervisor::HasInstance(hyp_obj)) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify a Hypervisor object instance")));
+    }
+
+    if(args.Length() == 1 || !args[1]->IsFunction()) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify a callback function as the second argument")));
+    }
+
+    // Path string
+    const char *path = parseString(args[0]);
+
+    // Hypervisor context
+    Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+
+    // Create baton
+    GetSaveImageXmlBaton* baton = new GetSaveImageXmlBaton();
+
+    // Callback
+    Local<Function> callback = Local<Function>::Cast(args[1]);
+    baton->callback = Persistent<Function>::New(callback);
+
+    // Add data
+    baton->hypervisor = hypervisor;
+    baton->flags = flags;
+    baton->path = path;
+
+    // Compose req
+    uv_work_t* req = new uv_work_t;
+    req->data = baton;
+
+    uv_queue_work(
+        uv_default_loop(),
+        req,
+        GetSaveImageXmlAsync,
+        (uv_after_work_cb)GetSaveImageXmlAsyncAfter
+    );
+
+    return scope.Close(Undefined());
+
+  }
+
+	void UpdateSaveImageXmlAsync(uv_work_t* req) {
+		UpdateSaveImageXmlBaton* baton = static_cast<UpdateSaveImageXmlBaton*>(req->data);
+
+		Hypervisor *hypervisor = baton->hypervisor;
+    const char *path = baton->path;
+    const char *xml = baton->xml;
+		unsigned int flags = baton->flags;
+
+		virErrorPtr err;
+    int ret = -1;
+
+		ret = virDomainSaveImageDefineXML(hypervisor->connection(), path, xml, flags);
+
+    if(ret == -1) {
+      err = virGetLastError();
+      baton->error = err->message;
+    }
+
+    baton->res = ret;
+	}
+
+	void UpdateSaveImageXmlAsyncAfter(uv_work_t* req) {
+		HandleScope scope;
+
+		UpdateSaveImageXmlBaton* baton = static_cast<UpdateSaveImageXmlBaton*>(req->data);
+		delete req;
+
+		Handle<Value> argv[2];
+
+		if (!baton->error.empty()) {
+			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[1] = Undefined();
+		}
+
+		else {
+			argv[0] = Undefined();
+			argv[1] = scope.Close(True());
+		}
+
+		TryCatch try_catch;
+		if (try_catch.HasCaught())
+			FatalException(try_catch);
+
+		baton->callback->Call(Context::GetCurrent()->Global(), 2, argv);
+		delete baton;
+	}
+
+  Handle<Value> Domain::UpdateSaveImageXml(const Arguments& args) {
+    HandleScope scope;
+
+    if(args.Length() == 0 || !args[0]->IsString()) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify a path string as the first argument")));
+    }
+
+    if(args.Length() == 1 || !args[1]->IsString()) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify domain XML as the second argument")));
+    }
+
+    Local<Object> hyp_obj = args.This();
+
+    if(!Hypervisor::HasInstance(hyp_obj)) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify a Hypervisor object instance")));
+    }
+
+    if(args.Length() == 2 || !args[2]->IsFunction()) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify a callback function as the third argument")));
+    }
+
+    unsigned int flags = 0;
+
+    // Path and XML strings
+    const char *path = parseString(args[0]);
+    const char *xml  = parseString(args[1]);
+
+    // Hypervisor context
+    Hypervisor *hypervisor = ObjectWrap::Unwrap<Hypervisor>(hyp_obj);
+
+    // Create baton
+    UpdateSaveImageXmlBaton* baton = new UpdateSaveImageXmlBaton();
+
+    // Callback
+    Local<Function> callback = Local<Function>::Cast(args[1]);
+    baton->callback = Persistent<Function>::New(callback);
+
+    // Add data
+    baton->hypervisor = hypervisor;
+    baton->path = path;
+    baton->xml = xml;
+    baton->flags = flags;
+
+    // Compose req
+    uv_work_t* req = new uv_work_t;
+    req->data = baton;
+
+    uv_queue_work(
+        uv_default_loop(),
+        req,
+        UpdateSaveImageXmlAsync,
+        (uv_after_work_cb)UpdateSaveImageXmlAsyncAfter
+    );
+
+    return scope.Close(Undefined());
+  }
 
 } //namespace NodeLibvirt
 
