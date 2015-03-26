@@ -1672,11 +1672,6 @@ namespace NodeLibvirt {
     SetTimeBaton* baton = new SetTimeBaton();
     Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-    long long seconds = 0;
-    unsigned int nseconds = 0;
-    unsigned int flags = 0;
-    int ret = -1;
-
     if (args.Length() == 0) {
       return ThrowException(Exception::TypeError(
             String::New("You must specify arguments to invoke this function")));
@@ -1686,6 +1681,12 @@ namespace NodeLibvirt {
       return ThrowException(Exception::TypeError(
             String::New("You must specify the seconds, nanoseconds, and flags as numbers.")));
     }
+
+    // get data
+    long long seconds = args[0]->Int32Value();
+    unsigned int nseconds = args[1]->Int32Value();
+    unsigned int flags = args[2]->Int32Value();
+    int ret = -1;
 
     // Callback
     Local<Function> callback = Local<Function>::Cast(args[3]);
