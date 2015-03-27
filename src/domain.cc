@@ -97,6 +97,7 @@ namespace NodeLibvirt {
 		const char* xml;
 		unsigned int flags;
 		Hypervisor* hypervisor;
+    virErrorPtr errObj;
   };
 
 	struct DetachDeviceBaton : BatonBase {
@@ -537,6 +538,7 @@ namespace NodeLibvirt {
 		if(domain->domain_ == NULL) {
 			err = virGetLastError();
 			baton->error = err->message;
+      baton->errObj = err;
 		}
 
 		else {
@@ -553,7 +555,7 @@ namespace NodeLibvirt {
 		Handle<Value> argv[2];
 
 		if (!baton->error.empty()) {
-			argv[0] = Exception::Error(String::New(baton->error.c_str()));
+			argv[0] = Error::New(baton->errObj);
 			argv[1] = Undefined();
 		}
 
