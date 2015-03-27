@@ -166,6 +166,7 @@ namespace NodeLibvirt {
 	struct SaveBaton : BatonBase {
 		int res;
 		const char* path;
+    const char* xml;
 	};
 
 	struct SuspendBaton : BatonBase {
@@ -1286,10 +1287,12 @@ namespace NodeLibvirt {
 		SaveBaton* baton = static_cast<SaveBaton*>(req->data);
 		Domain *domain = baton->domain;
 		const char *path = baton->path;
+		const char *xml = baton->xml;
+    unsigned int flags = 0;
 		virErrorPtr err;
 
 		int ret = -1;
-		ret = virDomainSave(domain->domain_, path);
+		ret = virDomainSaveFlags(domain->domain_, path, xml, flags);
 
 		if(ret == -1) {
 			err = virGetLastError();
@@ -1329,32 +1332,52 @@ namespace NodeLibvirt {
 	Handle<Value> Domain::Save(const Arguments& args) {
 		HandleScope scope;
 
+    // Path
 		if(args.Length() == 0 || !args[0]->IsString()) {
 			return ThrowException(Exception::TypeError(
 						String::New("You must specify the destination path string as the first argument")));
 		}
 
-		if(args.Length() == 1 || !args[1]->IsFunction()) {
-			return ThrowException(Exception::TypeError(
-						String::New("You must specify a callback function as the second argument")));
-		}
-
-    // Path string
 		const char *path = parseString(args[0]);
 
+    // XML
+		if(args.Length() == 1 || args[1]->IsString()) {
+      if (!args[1]->IsFunction()) {
+			  return ThrowException(Exception::TypeError(
+						  String::New("You must specify updated domain XML as the second argument")));
+      }
+		}
+
+    const char *xml = parseString(args[1]);
+
+    // Callback
+    if(args.Length() == 2) {
+      if (!args[1]->IsString() || !args[2]->IsFunction()) {
+        return ThrowException(Exception::TypeError(
+              String::New("You must specifiy a callback function as the third argument")));
+      }
+    }
+
+    Local<Function> callback = Local<Function>::Cast(args[2]);
+
     // Domain context
+    Local<Object> dom_obj = args.This();
+
+    if(!Domain::HasInstance(dom_obj)) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify a Domain object instance")));
+    }
+
     Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
     // Create baton
     SaveBaton* baton = new SaveBaton();
 
-    // Callback
-    Local<Function> callback = Local<Function>::Cast(args[1]);
-    baton->callback = Persistent<Function>::New(callback);
-
     // Add data
-    baton->domain = domain;
-    baton->path   = path;
+    baton->callback = Persistent<Function>::New(callback);
+    baton->domain   = domain;
+    baton->path     = path;
+    baton->xml      = xml;
 
     // Compose req
     uv_work_t* req = new uv_work_t;
