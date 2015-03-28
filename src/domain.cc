@@ -1343,7 +1343,7 @@ namespace NodeLibvirt {
 		const char *path = parseString(args[0]);
 
     // XML
-		if(args.Length() == 1 || args[1]->IsString()) {
+		if(args.Length() == 1 || !args[1]->IsString()) {
       return ThrowException(Exception::TypeError(
             String::New("You must specify updated domain XML as the second argument")));
 		}
