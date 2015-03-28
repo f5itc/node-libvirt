@@ -1344,7 +1344,6 @@ namespace NodeLibvirt {
     if (!args[1]->IsFunction()) {
       return ThrowException(Exception::TypeError(
             String::New("You must specifiy a callback function as the second argument")));
-      }
     }
 
     Local<Function> callback = Local<Function>::Cast(args[1]);
