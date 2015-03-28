@@ -1289,12 +1289,10 @@ namespace NodeLibvirt {
 		SaveBaton* baton = static_cast<SaveBaton*>(req->data);
 		Domain *domain = baton->domain;
 		const char *path = baton->path;
-		const char *xml = baton->xml;
-    unsigned int flags = 0;
 		virErrorPtr err;
 
 		int ret = -1;
-		ret = virDomainSaveFlags(domain->domain_, path, xml, flags);
+		ret = virDomainSave(domain->domain_, path);
 
 		if(ret == -1) {
 			err = virGetLastError();
@@ -1342,23 +1340,14 @@ namespace NodeLibvirt {
 
 		const char *path = parseString(args[0]);
 
-    // XML
-		if(args.Length() == 1 || !args[1]->IsString()) {
-      return ThrowException(Exception::TypeError(
-            String::New("You must specify updated domain XML as the second argument")));
-		}
-
-    const char *xml = parseString(args[1]);
-
     // Callback
-    if(args.Length() == 2) {
-      if (!args[1]->IsString() || !args[2]->IsFunction()) {
-        return ThrowException(Exception::TypeError(
-              String::New("You must specifiy a callback function as the third argument")));
+    if (!args[1]->IsFunction()) {
+      return ThrowException(Exception::TypeError(
+            String::New("You must specifiy a callback function as the second argument")));
       }
     }
 
-    Local<Function> callback = Local<Function>::Cast(args[2]);
+    Local<Function> callback = Local<Function>::Cast(args[1]);
 
     // Domain context
     Local<Object> dom_obj = args.This();
@@ -1377,7 +1366,6 @@ namespace NodeLibvirt {
     baton->callback = Persistent<Function>::New(callback);
     baton->domain   = domain;
     baton->path     = path;
-    baton->xml      = xml;
 
     // Compose req
     uv_work_t* req = new uv_work_t;
