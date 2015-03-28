@@ -555,8 +555,8 @@ namespace NodeLibvirt {
 		Handle<Value> argv[2];
 
 		if (!baton->error.empty()) {
-			argv[0] = Error::New(baton->errObj);
-			argv[1] = Undefined();
+			//argv[0] = Error::New(baton->errObj);
+			//argv[1] = Undefined();
 		}
 
 		else {
@@ -1344,10 +1344,8 @@ namespace NodeLibvirt {
 
     // XML
 		if(args.Length() == 1 || args[1]->IsString()) {
-      if (!args[1]->IsFunction()) {
-			  return ThrowException(Exception::TypeError(
-						  String::New("You must specify updated domain XML as the second argument")));
-      }
+      return ThrowException(Exception::TypeError(
+            String::New("You must specify updated domain XML as the second argument")));
 		}
 
     const char *xml = parseString(args[1]);
