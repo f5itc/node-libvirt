@@ -4180,7 +4180,7 @@ namespace NodeLibvirt {
     UpdateSaveImageXmlBaton* baton = new UpdateSaveImageXmlBaton();
 
     // Callback
-    Local<Function> callback = Local<Function>::Cast(args[1]);
+    Local<Function> callback = Local<Function>::Cast(args[2]);
     baton->callback = Persistent<Function>::New(callback);
 
     // Add data
