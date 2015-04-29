@@ -2483,11 +2483,8 @@ namespace NodeLibvirt {
     }
 
     else {
-      //Local<String> xml = String::New(xml_);
       baton->xml = xml_;
     }
-    //free(xml_);
-    //return scope.Close(xml);
   }
 
   void ToXmlAsyncAfter(uv_work_t* req) {
@@ -4065,8 +4062,6 @@ namespace NodeLibvirt {
     else {
       baton->xml = xml_;
     }
-
-    free(xml_);
   }
 
   void GetSaveImageXmlAsyncAfter(uv_work_t* req) {
