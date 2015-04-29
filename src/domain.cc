@@ -1297,7 +1297,13 @@ namespace NodeLibvirt {
     virErrorPtr err;
 
     int ret = -1;
-    ret = virDomainSaveFlags(domain->domain_, path, xml, flags);
+    if(strlen(xml) > 0) {
+      ret = virDomainSaveFlags(domain->domain_, path, xml, flags);
+    }
+
+    else {
+      ret = virDomainSave(domain->domain_, path);
+    }
 
     if(ret == -1) {
       err = virGetLastError();
@@ -1418,7 +1424,14 @@ namespace NodeLibvirt {
     virErrorPtr err;
 
     int ret = -1;
-    ret = virDomainRestoreFlags(hypervisor->connection(), path, xml, flags);
+
+    if (strlen(xml) > 0) {
+      ret = virDomainRestoreFlags(hypervisor->connection(), path, xml, flags);
+    }
+
+    else {
+      ret = virDomainRestore(hypervisor->connection(), path);
+    }
 
     if(ret == -1) {
       err = virGetLastError();
