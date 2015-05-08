@@ -1,6 +1,7 @@
 // Copyright 2010, Camilo Aguilar. Cloudescape, LLC.
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <node_buffer.h>
 #include "domain.h"
 
@@ -1883,7 +1884,7 @@ namespace NodeLibvirt {
     Handle<Value> argv[2];
 
     if (!baton->error.empty()) {
-      argv[0] =Exception::Error(String::New(baton->error.c_str()));
+      argv[0] = Exception::Error(String::New(baton->error.c_str()));
       argv[1] = Undefined();
     }
 
@@ -1910,20 +1911,19 @@ namespace NodeLibvirt {
     long long seconds = 0;
     unsigned int nseconds = 0;
     unsigned int flags = 0;
-    int ret = -1;
 
-    if (args.Length() == 0) {
+    if (!args[0]->IsFunction()) {
       return ThrowException(Exception::TypeError(
-            String::New("You must specify arguments to invoke this function")));
+            String::New("You must specify a callback function as the only argument.")));
     }
 
-    if(!args[0]->IsInt32() || !args[1]->IsInt32() || !args[2]->IsInt32()) {
+    if ((seconds = time(NULL)) == (time_t) -1) {
       return ThrowException(Exception::TypeError(
-            String::New("You must specify the seconds, nanoseconds, and flags as numbers.")));
+            String::New("Unable to get current time")));
     }
 
     // Callback
-    Local<Function> callback = Local<Function>::Cast(args[3]);
+    Local<Function> callback = Local<Function>::Cast(args[0]);
 
     // Add data
     baton->domain = domain;
@@ -1931,7 +1931,6 @@ namespace NodeLibvirt {
     baton->seconds = seconds;
     baton->nseconds = nseconds;
     baton->flags = flags;
-    baton->ret = ret;
 
     // Compose request
     uv_work_t* req = new uv_work_t;
